@@ -7,18 +7,19 @@ DIR=$(dirname "$0")
 RED="\e[1;31m"
 GREEN="\e[1;32m"
 YELLOW="\e[1;33m"
+GRAY="\e[1;90m"
 NORM="\e[0m"
 
 function _info() {
-    echo -e "$(date +"%Y-%m-%d %H:%M:%S") ${GREEN}[INFO]${NORM} ${1}"
-}
-
-function _error() {
-    echo -e "$(date +"%Y-%m-%d %H:%M:%S") ${RED}[ERROR]${NORM} ${1}"
+    echo -e "$(date +"%Y-%m-%d %H:%M:%S")  ${GREEN}[INFO]${GRAY} ${1}${NORM}"
 }
 
 function _warn() {
-    echo -e "$(date +"%Y-%m-%d %H:%M:%S") ${YELLOW}[WARN]${NORM} ${1}"
+    echo -e "$(date +"%Y-%m-%d %H:%M:%S")  ${YELLOW}[WARN]${GRAY} ${1}${NORM}"
+}
+
+function _error() {
+    echo -e "$(date +"%Y-%m-%d %H:%M:%S")  ${RED}[ERROR]${GRAY} ${1}${NORM}"
 }
 
 _info "Beginning deployment pipeline"
@@ -38,3 +39,39 @@ aws ecr get-login-password --region us-east-1 | docker login --username AWS --pa
 _info "Pushing image to docker"
 docker tag shbot_api ***REMOVED***/shbot_api:latest
 docker push ***REMOVED***/shbot_api:latest
+
+cd cloud
+PREV_ENV=$(terraform show -json | jq '.values.outputs.env.value' | sed 's/"//g')
+
+if [ $PREV_ENV == "split" ]
+then
+    _error "Both blue and green envs are deployed!"
+    exit
+elif [ $PREV_ENV == "blue" ]
+then
+    NEXT_ENV="green"
+else
+    NEXT_ENV="blue"
+fi
+
+
+_info "Beginning deploy to $NEXT_ENV environment"
+terraform apply -var "traffic_distribution=$PREV_ENV" --auto-approve
+
+_info "Waiting for instances to become healthy..."
+../scripts/poll_status.sh
+
+POLL_STATUS="$?"
+
+if [ $POLL_STATUS != "0" ]
+then
+    _error "Deploy failed! Reverting to $PREV_ENV environment."
+    terraform apply -var "traffic_distribution=$PREV_ENV" -var "enable_${NEXT_ENV}_env=false" --auto-approve
+
+    exit 1
+fi
+
+_info "All $NEXT_ENV instances are healthy - spinning down $PREV_ENV environment"
+terraform apply -var "traffic_distribution=$NEXT_ENV" -var "enable_${PREV_ENV}_env=false" --auto-approve
+
+_info "$NEXT_ENV release has been successfully deployed :)"

@@ -20,6 +20,7 @@ locals {
             blue = 100
             green = 0
         }
+        # We aren't using this right now, not sure we need canary deploys
         split = {
             blue = 50
             green = 50

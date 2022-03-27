@@ -61,10 +61,8 @@ resource "aws_lb_target_group" "blue" {
     vpc_id      = var.vpc_id
 
     health_check {
-        # TODO: change once container deployed
-        # path = "/_health"
-        # port = 7070
-        port                = 80
+        path                = "/_health"
+        port                = 7070
         healthy_threshold   = 3
         unhealthy_threshold = 3
         timeout             = 6
@@ -88,10 +86,8 @@ resource "aws_lb_target_group" "green" {
     vpc_id      = var.vpc_id
 
     health_check {
-        # TODO: change once container deployed
-        # path = "/_health"
-        # port = 7070
-        port                = 80
+        path                = "/_health"
+        port                = 7070
         healthy_threshold   = 3
         unhealthy_threshold = 3
         timeout             = 6

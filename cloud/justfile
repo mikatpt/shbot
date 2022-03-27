@@ -1,13 +1,21 @@
-set dotenv-load := true
 down:
     terraform apply -var 'enable_green_env=false' -var 'enable_blue_env=false' -var
     'traffic_distribution=split'
 
-deploy-blue:
+blue:
     terraform apply -var 'traffic_distribution=blue' -var 'enable_green_env=false'
 
-deploy-green:
-    terraform apply -var 'traffic_distribution=blue' -var 'enable_blue_env=false'
+green:
+    terraform apply -var 'traffic_distribution=green' -var 'enable_blue_env=false'
 
-deploy-split:
+# These rules are for the canary deploys.
+# If the given color fails to become healthy, revert.
+
+try-blue:
+    terraform apply -var 'traffic_distribution=green'
+
+try-green:
+    terraform apply -var 'traffic_distribution=blue'
+
+split:
     terraform apply -var 'traffic_distribution=split'

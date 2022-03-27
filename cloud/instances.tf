@@ -1,5 +1,7 @@
 locals {
     subnets = aws_subnet.shbot_api.*.id
+    env     = var.enable_green_env && var.enable_blue_env ? "split" : (
+              var.enable_green_env ? "green" : "blue")
 }
 
 #### IAM Permissions for EC2 instance
@@ -92,10 +94,15 @@ resource "aws_instance" "green" {
 
 # for SSH convenience
 output "instance_public_ips" {
-    value = var.traffic_distribution == "split" ? concat(aws_instance.blue.*.public_ip, aws_instance.green.*.public_ip) : (var.traffic_distribution == "green" ? aws_instance.green.*.public_ip : aws_instance.blue.*.public_ip)
+    value = local.env == "split" ? concat(aws_instance.blue.*.public_ip,
+    aws_instance.green.*.public_ip) : (local.env == "green" ? aws_instance.green.*.public_ip : aws_instance.blue.*.public_ip)
 }
 
 # for health check poller
 output "instance_ids" {
-    value = var.traffic_distribution == "split" ? concat(aws_instance.blue.*.id, aws_instance.green.*.id) : (var.traffic_distribution == "green" ? aws_instance.green.*.id : aws_instance.blue.*.id)
+    value = local.env == "split" ? concat(aws_instance.blue.*.id, aws_instance.green.*.id) : (local.env == "green" ? aws_instance.green.*.id : aws_instance.blue.*.id)
+}
+
+output "env" {
+    value = local.env
 }
