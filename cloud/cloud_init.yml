@@ -1,0 +1,60 @@
+#cloud-config
+users:
+  - default
+  - name: mikatpt
+    gecos: mikatpt
+    primary_group: mikatpt
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: users, admin
+    ssh_import_id:
+    lock_passwd: false
+    ssh_authorized_keys:
+      - ***REMOVED***
+
+#### Install docker and aws-cli using apt
+# https://stackoverflow.com/questions/24418815/how-do-i-install-docker-using-cloud-init
+apt:
+  sources:
+    docker.list:
+      source: deb [arch=amd64] https://download.docker.com/linux/ubuntu $RELEASE stable
+      keyid: 9DC858229FC7DD38854AE2D88D81803C0EBFCD88
+
+packages:
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - gnupg-agent
+  - software-properties-common
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - awscli
+
+#### Docker settings
+
+# Enable ipv4 forwarding, required on CIS hardened machines
+write_files:
+  - path: /etc/sysctl.d/enabled_ipv4_forwarding.conf
+    content: |
+      net.ipv4.conf.all.forwarding=1
+
+# Create the docker group
+groups:
+  - docker
+
+# Add default auto created user to docker group
+system_info:
+  default_user:
+    groups: [docker]
+
+####
+
+#### Authenticate with aws, pull the latest shbot image, and run it
+# Since we set an IAM profile on the instance, those credentials will automatically be used
+runcmd:
+  - aws configure set region us-east-1
+  - aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${ecr_img}
+  - docker pull ${ecr_img}:latest
+  - docker tag ${ecr_img}:latest shbot_api:latest
+  - docker rmi ${ecr_img}:latest
+  - docker run -d -p 80:7070 shbot_api:latest

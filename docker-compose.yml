@@ -1,0 +1,7 @@
+services:
+  api:
+    image: shbot_api
+    container_name: shbot_api
+    build: .
+    ports:
+      - "7070:7070"

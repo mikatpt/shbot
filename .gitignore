@@ -1,0 +1,6 @@
+/target
+.env
+*.pem
+cloud/.terraform
+cloud/terraform.tfstate*
+data/
