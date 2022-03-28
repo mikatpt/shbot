@@ -56,7 +56,7 @@ _info "Beginning deploy to $NEXT_ENV environment"
 terraform apply --auto-approve
 
 _info "Waiting for instances to become healthy..."
-../scripts/poll_status.sh
+../scripts/poll_status
 
 POLL_STATUS="$?"
 

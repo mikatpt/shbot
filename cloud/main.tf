@@ -30,14 +30,25 @@ terraform {
 # Manages our api server's resources
 # (Add more outputs if we need them!)
 module "server" {
-    source = "./modules/server"
+    source              = "./modules/server"
 
-    api_name = "shbot_api"
-    subdomain_name = ""
-    vpc_id = var.vpc_id
-    infra_version = var.infra_version
-    enable_green = var.enable_green
-    enable_blue = var.enable_blue
-    ecr_api_image = "***REMOVED***/shbot_api"
-    public_key_name = aws_key_pair.shbot_api.key_name
+    api_name            = "shbot_api"
+    subdomain_name      = ""
+    vpc_id              = var.vpc_id
+    infra_version       = var.infra_version
+    enable_green        = var.enable_green
+    enable_blue         = var.enable_blue
+    ecr_api_image       = "***REMOVED***/shbot_api"
+    public_key_name     = aws_key_pair.shbot_api.key_name
+    public_subnet_ids   = aws_subnet.public.*.id
+}
+
+# Manages database resources
+module "database" {
+    source              = "./modules/database"
+
+    vpc_id              = var.vpc_id
+    infra_version       = var.infra_version
+    public_key_name     = aws_key_pair.shbot_api.key_name
+    private_subnet_id   = aws_subnet.private.id
 }

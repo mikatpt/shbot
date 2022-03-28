@@ -1,6 +1,9 @@
 /target
 .env
+.env.dev
+.env.prod
 *.pem
+cloud/.terraform.lock.hcl
 cloud/.terraform
 cloud/terraform.tfstate*
 data/

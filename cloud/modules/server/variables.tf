@@ -35,3 +35,7 @@ variable "public_key_name" {
     description = "name for saved public key; for SSH'ing"
     type        = string
 }
+
+variable "public_subnet_ids" {
+    type = list
+}

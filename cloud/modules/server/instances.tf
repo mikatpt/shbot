@@ -1,5 +1,6 @@
 locals {
-    subnets = aws_subnet.api.*.id
+    # subnets = aws_subnet.api.*.id
+    subnets = var.public_subnet_ids
     env     = var.enable_green && var.enable_blue ? "split" : (
               var.enable_green ? "green" : "blue")
 }
@@ -33,22 +34,22 @@ resource "aws_iam_role" "api" {
 
 # This policy allows all ECR actions.
 resource "aws_iam_role_policy" "ecr_policy" {
-  name = "ecr_policy"
-  role = aws_iam_role.api.id
+    name = "ecr_policy"
+    role = aws_iam_role.api.id
 
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = [
-            "ecr:*",
-            "cloudtrail:LookupEvents"
+    policy = jsonencode({
+        Version = "2012-10-17"
+        Statement = [
+            {
+                Action = [
+                    "ecr:*",
+                    "cloudtrail:LookupEvents"
+                ]
+                Effect   = "Allow"
+                Resource = "*"
+            },
         ]
-        Effect   = "Allow"
-        Resource = "*"
-      },
-    ]
-  })
+    })
 }
 
 # We can scale up availability zones and instances separately

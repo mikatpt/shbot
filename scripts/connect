@@ -1,0 +1,30 @@
+#!/bin/bash
+
+INPUT=${1:-}
+DIR=$(dirname "$0")
+
+if [ -z ${INPUT} ]; then
+    echo "Provide a host to connect to - api or db"; exit 1;
+fi
+
+# Grab outputs from terraform
+cd "$DIR"/../cloud
+
+OUTPUT=$(terraform show -json | jq '.values.outputs')
+DB_IP=$(echo $OUTPUT | jq '.db_ip.value' | sed 's/"//g')
+INSTANCE_IP=$(echo $OUTPUT | jq '.instance_public_ips.value[0]' | sed 's/"//g')
+
+# Replace hosts in ssh config
+sed -i "1s/\s.*/ $INSTANCE_IP/" ~/.ssh/config
+sed -i "4s/\s.*/ $DB_IP/" ~/.ssh/config
+
+echo "Connecting to host $INPUT"
+
+if [ $INPUT == "api" ]; then
+    ssh "ubuntu@$INSTANCE_IP"
+elif [ $INPUT == "db" ]; then
+    ssh -J ubuntu@${INSTANCE_IP} ubuntu@${DB_IP}
+else
+    echo "Unsupported host"
+    exit 1
+fi

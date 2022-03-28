@@ -1,0 +1,30 @@
+#cloud-config
+users:
+  - default
+  - name: mikatpt
+    gecos: mikatpt
+    primary_group: mikatpt
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: users, admin
+    ssh_import_id:
+    lock_passwd: false
+    ssh_authorized_keys:
+      - ***REMOVED***
+
+packages:
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - gnupg-agent
+  - software-properties-common
+  - postgresql
+  - postgresql-client-common
+
+runcmd:
+  # Allow access from anywhere (private network, so not worried)
+  - echo "host    all    all       0.0.0.0/0   md5" >> /etc/postgresql/12/main/pg_hba.conf
+  # Allow listening on all addresses
+  - sed -i "59i listen_addresses = '*'" /etc/postgresql/12/main/postgresql.conf
+  - systemctl enable postgresql
+  - systemctl start postgresql
+  - sudo -u postgres psql -c "CREATE ROLE mikatpt WITH SUPERUSER CREATEDB CREATEROLE LOGIN ENCRYPTED PASSWORD '${postgres_pass}';"

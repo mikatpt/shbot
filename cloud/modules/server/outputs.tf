@@ -14,3 +14,7 @@ output "instance_public_ips" {
 output "instance_ids" {
     value = local.env == "split" ? concat(aws_instance.blue.*.id, aws_instance.green.*.id) : (local.env == "green" ? aws_instance.green.*.id : aws_instance.blue.*.id)
 }
+
+# output "subnet_ids" {
+#     value = aws_subnet.api.*.id
+# }

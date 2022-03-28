@@ -1,0 +1,9 @@
+#!/bin/bash
+
+DIR=$(dirname "$0")
+DB=174.129.115.51
+
+cd "$DIR"/..
+
+# adjust for tunneling!
+ssh -i ~/.ssh/shbot.pem ubuntu@"$DB" "sudo -u postgres psql" < schema.sql

@@ -6,7 +6,8 @@ resource "aws_lb" "api" {
     name                = "${local.name}-v${var.infra_version}"
     internal            = false
     load_balancer_type  = "application"
-    subnets             = aws_subnet.api.*.id
+    # subnets             = aws_subnet.api.*.id
+    subnets             = var.public_subnet_ids
     security_groups     = [aws_security_group.api.id]
 }
 

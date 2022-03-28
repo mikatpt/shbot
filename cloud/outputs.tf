@@ -17,3 +17,7 @@ output "env" {
     value = var.enable_green && var.enable_blue ? "split" : (
             var.enable_green ? "green" : "blue")
 }
+
+output "db_ip" {
+    value = module.database.db_ip
+}

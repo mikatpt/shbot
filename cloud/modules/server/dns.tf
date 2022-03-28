@@ -26,14 +26,15 @@ resource "aws_route53_record" "cert_validation" {
 
 # This tells terraform to cause the route53 validation to happen
 resource "aws_acm_certificate_validation" "cert" {
-  certificate_arn         = aws_acm_certificate.com.arn
-  validation_record_fqdns = [ aws_route53_record.cert_validation.fqdn ]
+    certificate_arn         = aws_acm_certificate.com.arn
+    validation_record_fqdns = [ aws_route53_record.cert_validation.fqdn ]
 }
 
 ####
 
+# Apex domain
 resource "aws_route53_zone" "com" {
-    name    = "${local.subdomain}shereebot.com"
+    name    = "shereebot.com"
 }
 
 # Points traffic from *.shereebot.com to alb
@@ -48,3 +49,5 @@ resource "aws_route53_record" "com_record" {
         evaluate_target_health  = true
     }
 }
+
+# Later add subdomain support?
