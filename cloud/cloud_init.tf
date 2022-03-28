@@ -2,7 +2,7 @@ data "template_file" "cloud_init" {
     template = file("cloud_init.yml")
 
     vars = {
-        ecr_img = var.ecr_image_shbot_api
+        ecr_img = var.ecr_api_image
     }
 }
 

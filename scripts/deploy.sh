@@ -56,7 +56,7 @@ fi
 
 
 _info "Beginning deploy to $NEXT_ENV environment"
-terraform apply -var "traffic_distribution=$PREV_ENV" --auto-approve
+terraform apply --auto-approve
 
 _info "Waiting for instances to become healthy..."
 ../scripts/poll_status.sh
@@ -66,12 +66,12 @@ POLL_STATUS="$?"
 if [ $POLL_STATUS != "0" ]
 then
     _error "Deploy failed! Reverting to $PREV_ENV environment."
-    terraform apply -var "traffic_distribution=$PREV_ENV" -var "enable_${NEXT_ENV}_env=false" --auto-approve
+    terraform apply -var "enable_${NEXT_ENV}=false" --auto-approve
 
     exit 1
 fi
 
 _info "All $NEXT_ENV instances are healthy - spinning down $PREV_ENV environment"
-terraform apply -var "traffic_distribution=$NEXT_ENV" -var "enable_${PREV_ENV}_env=false" --auto-approve
+terraform apply -var "enable_${PREV_ENV}=false" --auto-approve
 
 _info "$NEXT_ENV release has been successfully deployed :)"

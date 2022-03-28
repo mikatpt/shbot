@@ -1,7 +1,7 @@
 locals {
     subnets = aws_subnet.shbot_api.*.id
-    env     = var.enable_green_env && var.enable_blue_env ? "split" : (
-              var.enable_green_env ? "green" : "blue")
+    env     = var.enable_green && var.enable_blue ? "split" : (
+              var.enable_green ? "green" : "blue")
 }
 
 #### IAM Permissions for EC2 instance
@@ -59,11 +59,11 @@ resource "aws_iam_role_policy" "ecr_policy" {
 # subnet_id = "${element(local.subnets, count.index)}"
 # 
 resource "aws_instance" "blue" {
-    count                   = var.enable_blue_env ? 1 : 0
+    count                   = var.enable_blue ? 1 : 0
     ami                     = "ami-000722651477bd39b"
     iam_instance_profile    = aws_iam_instance_profile.shbot_api_profile.name
     instance_type           = "t2.micro"
-    subnet_id               = "${flatten(local.subnets)[0]}"
+    subnet_id               = local.subnets[0]
     vpc_security_group_ids  = [aws_security_group.shbot_api.id]
     key_name                = aws_key_pair.shbot_api.key_name
 
@@ -76,11 +76,11 @@ resource "aws_instance" "blue" {
 }
 
 resource "aws_instance" "green" {
-    count                   = var.enable_green_env ? 1 : 0
+    count                   = var.enable_green ? 1 : 0
     ami                     = "ami-000722651477bd39b"
     iam_instance_profile    = aws_iam_instance_profile.shbot_api_profile.name
     instance_type           = "t2.micro"
-    subnet_id               = "${flatten(local.subnets)[1]}"
+    subnet_id               = local.subnets[1]
     vpc_security_group_ids  = [aws_security_group.shbot_api.id]
     key_name                = aws_key_pair.shbot_api.key_name
 
