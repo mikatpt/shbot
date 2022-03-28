@@ -49,12 +49,12 @@ system_info:
 
 ####
 
-#### Authenticate with aws, pull the latest shbot image, and run it
+#### Authenticate with aws, pull the latest api image, and run it
 # Since we set an IAM profile on the instance, those credentials will automatically be used
 runcmd:
   - aws configure set region us-east-1
   - aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${ecr_img}
   - docker pull ${ecr_img}:latest
-  - docker tag ${ecr_img}:latest shbot_api:latest
+  - docker tag ${ecr_img}:latest ${api_name}:latest
   - docker rmi ${ecr_img}:latest
-  - docker run -d -p 80:7070 shbot_api:latest
+  - docker run -d -p 80:7070 ${api_name}:latest

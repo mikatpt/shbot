@@ -25,7 +25,6 @@ function _error() {
 _info "Beginning deployment pipeline"
 cd "$DIR"/..
 
-
 _info "Building docker image"
 docker-compose build
 
@@ -34,7 +33,6 @@ docker image prune -f
 
 _info "Authenticating with docker"
 aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ***REMOVED***
-
 
 _info "Pushing image to docker"
 docker tag shbot_api ***REMOVED***/shbot_api:latest
@@ -53,7 +51,6 @@ then
 else
     NEXT_ENV="blue"
 fi
-
 
 _info "Beginning deploy to $NEXT_ENV environment"
 terraform apply --auto-approve

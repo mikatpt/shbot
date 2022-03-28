@@ -26,3 +26,18 @@ terraform {
 
     required_version = ">= 0.14.9"
 }
+
+# Manages our api server's resources
+# (Add more outputs if we need them!)
+module "server" {
+    source = "./modules/server"
+
+    api_name = "shbot_api"
+    subdomain_name = ""
+    vpc_id = var.vpc_id
+    infra_version = var.infra_version
+    enable_green = var.enable_green
+    enable_blue = var.enable_blue
+    ecr_api_image = "***REMOVED***/shbot_api"
+    public_key_name = aws_key_pair.shbot_api.key_name
+}

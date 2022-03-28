@@ -1,9 +1,13 @@
-resource "aws_lb" "shbot_api" {
-    name                = "shbot-api-v${var.infra_version}"
+locals {
+    name = replace(var.api_name, "_", "-")
+}
+
+resource "aws_lb" "api" {
+    name                = "${local.name}-v${var.infra_version}"
     internal            = false
     load_balancer_type  = "application"
-    subnets             = aws_subnet.shbot_api.*.id
-    security_groups     = [aws_security_group.shbot_api.id]
+    subnets             = aws_subnet.api.*.id
+    security_groups     = [aws_security_group.api.id]
 }
 
 locals {
@@ -15,11 +19,11 @@ locals {
 
 # Primary listener. Directs traffic to the correct target group depending on our deploy.
 # Weight options are blue|green|split
-resource "aws_lb_listener" "shbot_api_https" {
-    load_balancer_arn   = aws_lb.shbot_api.arn
+resource "aws_lb_listener" "api_https" {
+    load_balancer_arn   = aws_lb.api.arn
     port                = 443
     protocol            = "HTTPS"
-    certificate_arn     = aws_acm_certificate.shbot_api.arn
+    certificate_arn     = aws_acm_certificate.com.arn
 
     default_action {
         type = "forward"
@@ -45,8 +49,8 @@ resource "aws_lb_listener" "shbot_api_https" {
 }
 
 # Redirect all http traffic to https
-resource "aws_lb_listener" "shbot_api_http" {
-    load_balancer_arn   = aws_lb.shbot_api.arn
+resource "aws_lb_listener" "api_http" {
+    load_balancer_arn   = aws_lb.api.arn
     port                = 80
     protocol            = "HTTP"
 
@@ -62,7 +66,7 @@ resource "aws_lb_listener" "shbot_api_http" {
 
 # Blue resources
 resource "aws_lb_target_group" "blue" {
-    name        = "shbot-api-blue"
+    name        = "${local.name}-blue"
     port        = 80
     protocol    = "HTTP"
     vpc_id      = var.vpc_id
@@ -87,7 +91,7 @@ resource "aws_lb_target_group_attachment" "blue" {
 
 # Green resources
 resource "aws_lb_target_group" "green" {
-    name        = "shbot-api-green"
+    name        = "${local.name}-green"
     port        = 80
     protocol    = "HTTP"
     vpc_id      = var.vpc_id

@@ -1,12 +1,13 @@
 data "template_file" "cloud_init" {
-    template = file("cloud_init.yml")
+    template = file("./modules/server/cloud_init.yml")
 
     vars = {
-        ecr_img = var.ecr_api_image
+        ecr_img     = var.ecr_api_image
+        api_name    = var.api_name
     }
 }
 
-data "cloudinit_config" "shbot_api" {
+data "cloudinit_config" "api" {
     gzip = true
     base64_encode = true
     part {
