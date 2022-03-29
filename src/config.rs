@@ -3,7 +3,6 @@ use std::net::SocketAddr;
 
 use color_eyre::Result;
 use serde::Deserialize;
-use tracing::debug;
 
 #[derive(Deserialize)]
 pub struct Config {
@@ -17,8 +16,6 @@ pub struct Server {
 }
 
 pub fn new() -> Result<Config> {
-    debug!("Loading environment variables...");
-
     let port = env::var("SERVER_PORT")?;
     let address = SocketAddr::from(([0, 0, 0, 0], port.parse()?));
 
@@ -31,6 +28,5 @@ pub fn new() -> Result<Config> {
         ..Default::default()
     };
 
-    debug!("Environment loaded!");
     Ok(Config { server, postgres })
 }

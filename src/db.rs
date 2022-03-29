@@ -1,20 +1,25 @@
-use deadpool_postgres::{Config, Client, Pool, PoolError, Runtime::Tokio1};
+use deadpool_postgres::{Client, Config, Pool, PoolError, Runtime::Tokio1};
+use tokio_postgres::NoTls;
 
 pub fn create_pool(cfg: &Config) -> Pool {
-    cfg.create_pool(Some(Tokio1), tokio_postgres::NoTls).unwrap()
+    cfg.create_pool(Some(Tokio1), NoTls).unwrap()
 }
 
-pub async fn insert_stat(pool: &Pool, command: &str) -> color_eyre::Result<(), PoolError> {
+/// Inserts a film into the database.
+pub async fn insert_film(pool: &Pool, film_name: &str) -> color_eyre::Result<(), PoolError> {
     let client: Client = pool.get().await?;
 
-    let statement = client.prepare_cached(
-        "INSERT INTO cli_stats(command, count) 
-         VALUES($1, 1) 
-         ON CONFLICT (command) DO
-         UPDATE SET count = cli_stats.count + 1;"
-    ).await?;
+    let query = "
+        DO $$
+        DECLARE roles_id roles.id%TYPE;
+        BEGIN
+            INSERT INTO roles DEFAULT VALUES RETURNING id INTO roles_id;
+            INSERT INTO films(name, roles_id) VALUES ($1, roles_id);
+        END $$;";
 
-    client.execute(&statement, &[&command]).await?;
+    let statement = client.prepare_cached(query).await?;
+
+    client.execute(&statement, &[&film_name]).await?;
 
     Ok(())
 }

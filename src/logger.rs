@@ -4,9 +4,8 @@ use std::{fs::File, path::Path, sync::Once};
 use crate::Result;
 
 use tracing_error::ErrorLayer;
-use tracing_subscriber::{fmt, layer::SubscriberExt};
-use tracing_subscriber::{fmt::writer::BoxMakeWriter, EnvFilter};
-use tracing_subscriber::{util::SubscriberInitExt, Registry};
+use tracing_subscriber::fmt::{self, writer::BoxMakeWriter};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Registry};
 
 static INIT: Once = Once::new();
 
@@ -60,13 +59,7 @@ struct Logger {
 
 impl Logger {
     fn new(file: Option<File>, env_filter: Option<&str>) -> Result<Logger> {
-        let env_filter = env_filter
-            .map_or(EnvFilter::default(), EnvFilter::new)
-            .add_directive("hyper=info".parse()?)
-            .add_directive("mio=info".parse()?)
-            .add_directive("h2=info".parse()?)
-            .add_directive("tokio=info".parse()?)
-            .add_directive("rustls=info".parse()?);
+        let env_filter = env_filter.map_or(EnvFilter::default(), EnvFilter::new);
 
         Ok(Logger { env_filter, file })
     }
@@ -81,7 +74,7 @@ impl Logger {
         };
 
         // Disable colors when logging to files.
-        let mut event_format = fmt::format().compact().with_ansi(true);
+        let mut event_format = fmt::format();
         if should_write_to_file {
             event_format = event_format.with_ansi(false);
         }

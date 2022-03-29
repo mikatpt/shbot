@@ -3,7 +3,19 @@
 DIR=$(dirname "$0")
 DB=174.129.115.51
 
-cd "$DIR"/..
+# Grab outputs from terraform
+cd "$DIR"/../cloud
+OUTPUT=$(terraform show -json | jq '.values.outputs')
+DB_IP=$(echo $OUTPUT | jq '.db_ip.value' | sed 's/"//g')
+INSTANCE_IP=$(echo $OUTPUT | jq '.instance_public_ips.value[0]' | sed 's/"//g')
 
-# adjust for tunneling!
-ssh -i ~/.ssh/shbot.pem ubuntu@"$DB" "sudo -u postgres psql" < schema.sql
+# Replace hosts in ssh config
+sed -i "1s/\s.*/ $INSTANCE_IP/" ~/.ssh/config
+sed -i "4s/\s.*/ $DB_IP/" ~/.ssh/config
+
+cd ..
+
+# Apply schema file
+ssh -J ubuntu@${INSTANCE_IP} ubuntu@${DB_IP} "sudo -u postgres psql" < ./schema.sql
+
+# TBD apply migrations
