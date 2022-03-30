@@ -1,11 +1,15 @@
 use std::{env, fs, io};
 use std::{fs::File, path::Path, sync::Once};
 
-use crate::Result;
-
+use color_eyre::Result;
+use time::format_description;
 use tracing_error::ErrorLayer;
-use tracing_subscriber::fmt::{self, writer::BoxMakeWriter};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Registry};
+use tracing_subscriber::{
+    fmt::{self, writer::BoxMakeWriter},
+    layer::SubscriberExt,
+    util::SubscriberInitExt,
+    EnvFilter, Registry,
+};
 
 static INIT: Once = Once::new();
 
@@ -57,9 +61,12 @@ struct Logger {
     file: Option<File>,
 }
 
+// Uncomment out tokio stuff to enable the tokio console.
 impl Logger {
     fn new(file: Option<File>, env_filter: Option<&str>) -> Result<Logger> {
         let env_filter = env_filter.map_or(EnvFilter::default(), EnvFilter::new);
+        // .add_directive("tokio=trace".parse()?)
+        // .add_directive("runtime=trace".parse()?);
 
         Ok(Logger { env_filter, file })
     }
@@ -73,14 +80,20 @@ impl Logger {
             None => BoxMakeWriter::new(io::stdout),
         };
 
+        // Format time and logs into the format_layer for display.
+
+        let time_format = "[year]-[month]-[day] [hour]:[minute]:[second].[subsecond digits:2]";
+        let time_format = format_description::parse(time_format)?;
+        let timer = fmt::time::UtcTime::new(time_format);
+
+        let mut log_format = fmt::format().with_timer(timer);
         // Disable colors when logging to files.
-        let mut event_format = fmt::format();
         if should_write_to_file {
-            event_format = event_format.with_ansi(false);
+            log_format = log_format.with_ansi(false);
         }
 
-        // The format layer is responsible for deciding what the logs look like as they are written.
-        let format_layer = fmt::layer().event_format(event_format).with_writer(writer);
+        let format_layer = fmt::layer().event_format(log_format).with_writer(writer);
+        // let console_layer = console_subscriber::ConsoleLayer::builder().spawn();
 
         // Finally, the registry tracks tracing spans. We wrap the env layer and format layer and
         // it handles the rest, for the most part.
@@ -88,6 +101,7 @@ impl Logger {
             .with(self.env_filter)
             .with(format_layer)
             .with(ErrorLayer::default())
+            // .with(console_layer)
             .init();
         Ok(())
     }

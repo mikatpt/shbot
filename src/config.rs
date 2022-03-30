@@ -1,5 +1,4 @@
-use std::env;
-use std::net::SocketAddr;
+use std::{env, net::SocketAddr};
 
 use color_eyre::Result;
 use serde::Deserialize;
@@ -13,13 +12,14 @@ pub struct Config {
 #[derive(Deserialize)]
 pub struct Server {
     pub address: SocketAddr,
+    pub port: String,
 }
 
 pub fn new() -> Result<Config> {
     let port = env::var("SERVER_PORT")?;
     let address = SocketAddr::from(([0, 0, 0, 0], port.parse()?));
 
-    let server = Server { address };
+    let server = Server { port, address };
     let postgres = deadpool_postgres::Config {
         user: env::var("POSTGRES_USER").ok(),
         host: env::var("POSTGRES_HOST").ok(),

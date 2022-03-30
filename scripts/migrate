@@ -1,7 +1,6 @@
 #!/bin/bash
 
 DIR=$(dirname "$0")
-DB=174.129.115.51
 
 # Grab outputs from terraform
 cd "$DIR"/../cloud
@@ -13,7 +12,7 @@ INSTANCE_IP=$(echo $OUTPUT | jq '.instance_public_ips.value[0]' | sed 's/"//g')
 sed -i "1s/\s.*/ $INSTANCE_IP/" ~/.ssh/config
 sed -i "4s/\s.*/ $DB_IP/" ~/.ssh/config
 
-cd ..
+cd ../
 
 # Apply schema file
 ssh -J ubuntu@${INSTANCE_IP} ubuntu@${DB_IP} "sudo -u postgres psql" < ./schema.sql

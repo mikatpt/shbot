@@ -1,18 +1,14 @@
-mod config;
-mod logger;
-mod db;
-mod server;
-mod interceptors;
-
 use color_eyre::Result;
 use tracing::debug;
 
+use shbot::{config, logger, server};
+
 #[tokio::main]
 async fn main() -> Result<()> {
-    debug!("Loading environment variables...");
     dotenv::dotenv().ok();
-    debug!("Environment loaded!");
+
     logger::install(None);
+    debug!("Loaded environment variables");
 
     let cfg = config::new()?;
 

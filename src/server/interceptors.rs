@@ -1,9 +1,12 @@
 use std::time::Duration;
 
-use axum::error_handling::HandleErrorLayer;
-use axum::http::{HeaderMap, Request, StatusCode};
-use axum::{body::Bytes, response::Response, Router};
-
+use axum::{
+    body::Bytes,
+    error_handling::HandleErrorLayer,
+    http::{HeaderMap, Request, StatusCode},
+    response::Response,
+    Router,
+};
 use tower::{timeout::TimeoutLayer, BoxError, ServiceBuilder};
 use tower_http::{
     classify::ServerErrorsFailureClass, compression::CompressionLayer, trace::TraceLayer,
@@ -23,8 +26,8 @@ pub(crate) fn attach(router: Router) -> Router {
                 .make_span_with(|request: &Request<_>| {
                     tracing::debug_span!(
                         "request",
-                        req = %request.method(),
                         uri = %request.uri().path(),
+                        req = %request.method(),
                     )
                 })
                 .on_request(|_request: &Request<_>, _span: &Span| {})

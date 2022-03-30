@@ -23,6 +23,12 @@ function _error() {
 }
 
 _info "Beginning deployment pipeline"
+cd "$DIR"/../cloud
+
+_info "Setting postgres host"
+DB_IP=$(terraform show -json | jq '.values.outputs.db_ip.value' | sed 's/"//g')
+sed "s/POSTGRES_HOST.*/POSTGRES_HOST=${DB_IP}/" ./.env.prod
+
 cd "$DIR"/..
 
 _info "Building docker image"

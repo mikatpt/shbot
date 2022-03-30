@@ -9,36 +9,36 @@ DO $schema$ BEGIN
 
     RAISE INFO 'Creating tables';
     CREATE TABLE IF NOT EXISTS roles (
-        id          SERIAL PRIMARY KEY,
-        ae          TIMESTAMP,
-        editor      TIMESTAMP,
-        sound       TIMESTAMP,
-        color       TIMESTAMP,
-        updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        id          UUID PRIMARY KEY,
+        ae          TIMESTAMPTZ,
+        editor      TIMESTAMPTZ,
+        sound       TIMESTAMPTZ,
+        color       TIMESTAMPTZ,
+        updated_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS films (
-        id              SERIAL PRIMARY KEY,
-        roles_id        INTEGER REFERENCES roles,
+        id              UUID PRIMARY KEY,
+        roles_id        UUID REFERENCES roles,
         name            VARCHAR(255) NOT NULL UNIQUE,
-        created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS students (
-        id              SERIAL PRIMARY KEY,
-        roles_id        INTEGER REFERENCES roles,
+        id              UUID PRIMARY KEY,
+        roles_id        UUID REFERENCES roles,
         email           VARCHAR(255) NOT NULL UNIQUE,
-        created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
 
     ---- Join tables ----
 
     CREATE TABLE IF NOT EXISTS students_films (
-        student_id  INTEGER REFERENCES students,
-        film_id     INTEGER REFERENCES films,
+        student_id  UUID REFERENCES students,
+        film_id     UUID REFERENCES films,
         role        VARCHAR(255),
         CONSTRAINT students_films_pk PRIMARY KEY (student_id, film_id)
     );
