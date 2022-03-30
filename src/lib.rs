@@ -1,11 +1,10 @@
-pub mod config;
-pub mod logger;
 pub mod server;
 pub mod store;
 
-mod errors;
 mod models;
 mod utils;
 
-use crate::errors::Error;
+pub use utils::{config, errors, logger};
+
 pub type Result<T> = std::result::Result<T, Error>;
+use crate::errors::Error;

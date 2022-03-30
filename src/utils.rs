@@ -1,3 +1,7 @@
+pub mod config;
+pub mod errors;
+pub mod logger;
+
 // Macro stuff:
 // $(), == repeating field
 // $(),* == repeating field, separated by commas
