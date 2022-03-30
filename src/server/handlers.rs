@@ -1,12 +1,16 @@
 use axum::{
-    extract::{Extension, Path},
+    extract::{Extension, Form, Path},
     response::Html,
     Json,
 };
 use serde::Deserialize;
 use tracing::info;
 
-use crate::{models::Film, server::State, Error, Result};
+use crate::{
+    models::{slack::SlackSlashCommand, Film},
+    server::State,
+    Error, Result,
+};
 
 pub(super) async fn home() -> Html<&'static str> {
     Html("<h1>Hello from the ShereeBot server!</h1>")
@@ -28,7 +32,7 @@ pub(super) async fn get_film(
 
     match state.db.get_film(&name).await {
         Ok(Some(film)) => Ok(Json(film)),
-        Ok(None) => Err(Error::NotFound),
+        Ok(None) => Err(Error::NotFound("do stuff")),
         Err(e) => Err(e),
     }
 }
@@ -48,4 +52,10 @@ pub(super) async fn insert_film(
         Ok(film) => Ok(Json(film)),
         Err(e) => Err(e),
     }
+}
+
+//text: "film1, film2, film 3,film 4 ,",
+pub(super) async fn testing(Form(slash_command): Form<SlackSlashCommand>) -> Json<&'static str> {
+    dbg!(slash_command);
+    Json("{}")
 }

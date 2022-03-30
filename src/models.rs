@@ -2,6 +2,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+pub mod slack;
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Film {
     pub id: Uuid,

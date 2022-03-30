@@ -31,6 +31,7 @@ Teacher facing side:
     - Show status of every movie
 
 ## Data layer
+- [Diagram](https://sqldbm.com/Project/Dashboard/All/)
 
 students
     - id

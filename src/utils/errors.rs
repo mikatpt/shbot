@@ -6,12 +6,12 @@ use tracing::{error, warn};
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     // User errors (expected)
-    #[error("Invalid input")]
+    #[error("Invalid input: {0}")]
     InvalidArg(String),
     #[error("Duplicate data: {0}")]
     Duplicate(String),
-    #[error("Not found")]
-    NotFound,
+    #[error("Not found: {0}")]
+    NotFound(&'static str),
 
     // Application errors (unexpected)
     #[error("Unknown error")]
@@ -28,11 +28,28 @@ pub enum Error {
     CreatePool(#[from] deadpool_postgres::CreatePoolError),
 }
 
+/// These are what the application reports to the end user.
+#[derive(thiserror::Error, Debug)]
+pub enum UserError<E: AsRef<str>> {
+    // Expected errors
+    #[error("Invalid input")]
+    InvalidArg(E),
+    #[error("Duplicate data: {0}")]
+    Duplicate(E),
+    #[error("Not found")]
+    NotFound(E),
+
+    // Unexpected errors
+    #[error("Internal error: {0}")]
+    Internal(String),
+
+}
+
 /// User errors logged at `warn`.
 /// Application errors logged at `error`.
 fn report_error(err: &Error) {
     match err {
-        Error::InvalidArg(_) | Error::Duplicate(_) | Error::NotFound => warn!("{}", err),
+        Error::InvalidArg(_) | Error::Duplicate(_) | Error::NotFound(_) => warn!("{}", err),
         _ => error!("{}", err),
     }
 }
@@ -41,10 +58,9 @@ impl IntoResponse for Error {
     fn into_response(self) -> axum::response::Response {
         report_error(&self);
         let (status, error_msg) = match self {
-            Error::InvalidArg(_) | Error::Duplicate(_) => {
-                (StatusCode::BAD_REQUEST, format!("{}", self))
+            Error::InvalidArg(_) | Error::Duplicate(_) | Error::NotFound(_) => {
+                (StatusCode::OK, format!("{}", self))
             }
-            Error::NotFound => (StatusCode::NOT_FOUND, format!("{}", self)),
             Error::Unknown => (StatusCode::INTERNAL_SERVER_ERROR, format!("{}", self)),
             _ => (
                 StatusCode::INTERNAL_SERVER_ERROR,

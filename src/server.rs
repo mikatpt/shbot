@@ -1,6 +1,11 @@
 use std::sync::Arc;
 
-use axum::{extract::Extension, response::Html, routing::get, Router};
+use axum::{
+    extract::Extension,
+    response::Html,
+    routing::{get, post},
+    Router,
+};
 use tracing::info;
 
 use crate::{
@@ -25,6 +30,7 @@ impl InnerState {
     }
 }
 
+/// Initializes server state and runs the server.
 pub async fn serve(cfg: &Config) -> Result<()> {
     let db = crate::store::new(&cfg.postgres)?;
     let state = InnerState::new(db);
@@ -40,6 +46,7 @@ pub async fn serve(cfg: &Config) -> Result<()> {
     Ok(())
 }
 
+/// Initialize axum app and attach all routes.
 fn new_router(state: State) -> Router {
     let app = Router::new()
         .route("/", get(handlers::home))
@@ -49,6 +56,7 @@ fn new_router(state: State) -> Router {
         )
         .route("/films/:name", get(handlers::get_film))
         .route("/_health", get(health_check))
+        .route("/testing", post(handlers::testing))
         .layer(Extension(state));
 
     interceptors::attach(app)

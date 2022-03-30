@@ -14,11 +14,11 @@ pub(crate) fn new(cfg: &deadpool_postgres::Config) -> Result<Database<PostgresCl
 }
 
 /// Server-facing API boundary.
-///
-/// You should implement all methods from the `Client` trait on this struct for each new client.
-///
-/// This is not statically checked; that would require us writing and implementing an external
-/// trait, which just isn't done in Rust; you'd have to import the trait on every usage.
+//
+// You should implement all methods from the `Client` trait on this struct for each new client.
+//
+// This is not statically checked; that would require us writing and implementing an external
+// trait, which just isn't done in Rust; you'd have to import the trait on every usage.
 #[derive(Debug)]
 pub(crate) struct Database<C: Client> {
     client: C,
@@ -45,8 +45,8 @@ pub(crate) struct PostgresClient {
     pool: Pool,
 }
 
-/// Server-facing API implementation for Postgres.
-/// Implementation is split between files on model boundaries.
+// Server-facing API implementation for Postgres.
+// Implementation is split between files on model boundaries.
 impl Database<PostgresClient> {
     pub fn new(pool: Pool) -> Self {
         let client = PostgresClient { pool };
