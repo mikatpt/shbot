@@ -52,9 +52,8 @@ function _poll_id() {
 }
 
 # Poll all instances for health
-for ID in "${INSTANCES[@]}"
+for ID in ${INSTANCES[@]}
 do
-    :
     _info "Polling health status for $ID..."
     _poll_id $ID
 done

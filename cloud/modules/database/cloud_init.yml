@@ -28,3 +28,5 @@ runcmd:
   - systemctl enable postgresql
   - systemctl start postgresql
   - sudo -u postgres psql -c "CREATE ROLE mikatpt WITH SUPERUSER CREATEDB CREATEROLE LOGIN ENCRYPTED PASSWORD '${postgres_pass}';"
+  - sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD '${postgres_pass}';"
+  - systemctl restart postgresql

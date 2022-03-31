@@ -57,4 +57,4 @@ runcmd:
   - docker pull ${ecr_img}:latest
   - docker tag ${ecr_img}:latest ${api_name}:latest
   - docker rmi ${ecr_img}:latest
-  - docker run -d -p 80:7070 ${api_name}:latest
+  - docker run -d -p 80:7070 --name shbot_api ${api_name}:latest

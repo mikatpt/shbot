@@ -78,7 +78,7 @@ resource "aws_lb_target_group" "blue" {
         healthy_threshold   = 3
         unhealthy_threshold = 3
         timeout             = 6
-        interval            = 30
+        interval            = 300
         matcher             = "200"
     }
 }
@@ -103,7 +103,7 @@ resource "aws_lb_target_group" "green" {
         healthy_threshold   = 3
         unhealthy_threshold = 3
         timeout             = 6
-        interval            = 30
+        interval            = 300
         matcher             = "200"
     }
 }

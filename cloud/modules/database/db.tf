@@ -31,7 +31,7 @@ resource "aws_instance" "db" {
     }
 
     lifecycle {
-        prevent_destroy = true
+        # prevent_destroy = true
     }
 }
 
