@@ -4,7 +4,7 @@ use tokio_postgres::Row;
 use uuid::Uuid;
 
 use crate::{
-    models::{Film, Roles},
+    models::{Film, Priority, Roles},
     store::{Client, Database, PostgresClient},
     Error, Result,
 };
@@ -19,8 +19,8 @@ impl Database<PostgresClient> {
         self.client.get_film(film_name).await
     }
 
-    pub async fn insert_film(&self, film_name: &str) -> Result<Film> {
-        self.client.insert_film(film_name).await
+    pub async fn insert_film(&self, name: &str, priority: Priority) -> Result<Film> {
+        self.client.insert_film(name, priority).await
     }
 
     pub async fn update_film(&self, film: &Film) -> Result<()> {
@@ -34,22 +34,22 @@ impl Client for PostgresClient {
         let client = self.pool.get().await?;
 
         let stmt = "
-            SELECT f.id, f.name, r.ae, r.editor, r.sound, r.color
+            SELECT f.id, f.name, f.priority, r.ae, r.editor, r.sound, r.color
             FROM films as f, roles as r 
             WHERE f.roles_id = r.id;";
         let stmt = client.prepare_cached(stmt).await?;
 
         let rows = client.query(&stmt, &[]).await?;
-        let films = rows.into_iter().map(format_row_into_film).collect();
+        let films: Result<Vec<_>> = rows.into_iter().map(format_row_into_film).collect();
 
-        Ok(films)
+        Ok(films?)
     }
 
     async fn get_film(&self, name: &str) -> Result<Option<Film>> {
         let client = self.pool.get().await?;
 
         let stmt = "
-            SELECT f.id, f.name, r.ae, r.editor, r.sound, r.color
+            SELECT f.id, f.name, f.priority, r.ae, r.editor, r.sound, r.color
             FROM films as f, roles as r 
             WHERE f.name = $1
             AND f.roles_id = r.id;";
@@ -61,16 +61,16 @@ impl Client for PostgresClient {
         }
         let row = rows.pop().expect("^^just checked if empty");
 
-        Ok(Some(format_row_into_film(row)))
+        Ok(Some(format_row_into_film(row)?))
     }
 
-    async fn insert_film(&self, name: &str) -> Result<Film> {
+    async fn insert_film(&self, name: &str, priority: Priority) -> Result<Film> {
         let mut client = self.pool.get().await?;
 
         let stmt = "INSERT INTO roles(id) VALUES($1) RETURNING id;";
         let stmt = client.prepare_cached(stmt).await?;
 
-        let stmt2 = "INSERT INTO films(id, name, roles_id) VALUES($1, $2, $3);";
+        let stmt2 = "INSERT INTO films(id, name, priority, roles_id) VALUES($1, $2, $3, $4);";
         let stmt2 = client.prepare_cached(stmt2).await?;
 
         let transaction = client.transaction().await?;
@@ -81,8 +81,9 @@ impl Client for PostgresClient {
 
         let mut film = Film::default();
         let id = &film.id;
+        let p = priority.to_string();
 
-        let res = transaction.query(&stmt2, &[&id, &name, &role_id]).await;
+        let res = transaction.query(&stmt2, &[&id, &name, &p, &role_id]).await;
         if res.is_err() {
             return Err(Error::Duplicate(name.to_string()));
         }
@@ -118,9 +119,10 @@ impl Client for PostgresClient {
 
 // ------------- Helpers ------------- //
 
-fn format_row_into_film(row: Row) -> Film {
+fn format_row_into_film(row: Row) -> Result<Film> {
     let id: Uuid = row.get("id");
     let name: String = row.get("name");
+    let priority: String = row.get("priority");
     let roles: [Option<DateTime<Utc>>; 4] = [
         row.get("ae"),
         row.get("editor"),
@@ -128,5 +130,5 @@ fn format_row_into_film(row: Row) -> Film {
         row.get("color"),
     ];
     let roles = Roles::new(roles[0], roles[1], roles[2], roles[3]);
-    Film::new(id, name, roles)
+    Ok(Film::new(id, name, priority.parse()?, roles))
 }

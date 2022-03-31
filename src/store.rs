@@ -5,7 +5,10 @@ use deadpool_postgres::{Pool, Runtime::Tokio1};
 use tokio_postgres::NoTls;
 
 pub(crate) mod films;
-use crate::{models::Film, Result};
+use crate::{
+    models::{Film, Priority},
+    Result,
+};
 
 /// Returns a new Postgres database instance.
 pub(crate) fn new(cfg: &deadpool_postgres::Config) -> Result<Database<PostgresClient>> {
@@ -34,7 +37,7 @@ pub(crate) trait Client {
     async fn get_film(&self, film_name: &str) -> Result<Option<Film>>;
 
     /// Inserts an empty film with no roles worked.
-    async fn insert_film(&self, film_name: &str) -> Result<Film>;
+    async fn insert_film(&self, name: &str, priority: Priority) -> Result<Film>;
 
     /// Updates a film
     async fn update_film(&self, film: &Film) -> Result<()>;

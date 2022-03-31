@@ -9,7 +9,7 @@ use tracing::info;
 
 use crate::{
     models::slack::{AppMention, AuthChallenge, ResponseType, SlashRequest, SlashResponse},
-    models::Film,
+    models::{Film, Priority},
     server::{Result, State},
     UserError,
 };
@@ -59,9 +59,24 @@ pub(super) async fn insert_films(
     Form(slash_command): Form<SlashRequest>,
     Extension(state): Extension<State>,
 ) -> Result<Json<SlashResponse>> {
-    // Concurrently insert all films
-    let films: FuturesUnordered<_> = slash_command
+    let (priority, films) = slash_command
         .text
+        .trim()
+        .split_once(' ')
+        .unwrap_or_default();
+
+    let priority: Priority = if let Ok(p) = priority.to_uppercase().parse() {
+        p
+    } else {
+        let mut msg = "I wasn't able to read your command :(\n".to_string();
+        msg += "Command format is: /insertfilms HIGH film, film, film.\n\n";
+        msg += &format!("Your command was /insertfilms {}.\n", slash_command.text);
+        let res = SlashResponse::new(msg, Some(ResponseType::Ephemeral));
+        return Ok(Json(res));
+    };
+
+    // Concurrently insert all films
+    let films: FuturesUnordered<_> = films
         .split(',')
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
@@ -69,7 +84,7 @@ pub(super) async fn insert_films(
             let s = state.clone();
             tokio::spawn(async move {
                 info!("inserting {}", &film);
-                s.db.insert_film(&film).await
+                s.db.insert_film(&film, priority).await
             })
         })
         .collect();

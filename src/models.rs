@@ -2,13 +2,21 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::Error;
 pub mod slack;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Film {
     pub id: Uuid,
     pub name: String,
+    pub priority: Priority,
     pub roles: Roles,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+pub enum Priority {
+    HIGH,
+    LOW,
 }
 
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
@@ -20,7 +28,7 @@ pub struct Roles {
     pub color: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 pub enum Role {
     Ae,
     Editor,
@@ -29,8 +37,13 @@ pub enum Role {
 }
 
 impl Film {
-    pub fn new(id: Uuid, name: String, roles: Roles) -> Self {
-        Film { id, name, roles }
+    pub fn new(id: Uuid, name: String, priority: Priority, roles: Roles) -> Self {
+        Film {
+            id,
+            name,
+            priority,
+            roles,
+        }
     }
     pub fn add_next_role(&mut self) -> bool {
         self.roles.add_next_role()
@@ -42,7 +55,29 @@ impl Default for Film {
         Self {
             id: Uuid::new_v4(),
             name: "".to_string(),
+            priority: Priority::HIGH,
             roles: Roles::default(),
+        }
+    }
+}
+
+impl std::fmt::Display for Priority {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            &Priority::LOW => write!(f, "LOW"),
+            &Self::HIGH => write!(f, "HIGH"),
+        }
+    }
+}
+
+impl std::str::FromStr for Priority {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "HIGH" => Ok(Priority::HIGH),
+            "LOW" => Ok(Priority::LOW),
+            _ => Err(Error::InvalidArg("not a valid priority".into())),
         }
     }
 }
