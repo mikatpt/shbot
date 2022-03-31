@@ -3,8 +3,6 @@ use serde::{Deserialize, Serialize};
 use strum::{AsRefStr, EnumString};
 use uuid::Uuid;
 
-pub mod slack;
-
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Film {
     pub id: Uuid,

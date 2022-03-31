@@ -3,6 +3,7 @@ pub mod store;
 
 mod models;
 mod queue;
+mod slack;
 mod utils;
 
 pub use utils::{config, errors, logger};

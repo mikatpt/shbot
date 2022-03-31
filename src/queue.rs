@@ -1,17 +1,37 @@
-use std::cmp::Ordering;
 use std::collections::BinaryHeap;
+use std::{
+    cmp::Ordering,
+    sync::{Arc, Mutex},
+};
 
 use chrono::{DateTime, Utc};
 
 use crate::models::{Priority, Role};
 
-/// All films ready to be picked up.
-#[derive(Debug)]
-pub struct FilmQ {}
+#[derive(Debug, Default)]
+pub struct Queue {
+    pub film_q: Q,
+    pub wait_q: Q,
+}
+
+// pub fn thing() {
+//     let q = Queue::default();
+//     let a = q.film_q.clone();
+//     let b = a.lock().unwrap();
+//     a.lock().unwrap().push(QueueItem {
+//         student_slack_id: "".to_owned(),
+//         film_name: "".to_owned(),
+//         role: Role::Ae,
+//         priority: None,
+//         created_at: Utc::now(),
+//     });
+// }
+
+type Q = Arc<Mutex<BinaryHeap<QueueItem>>>;
 
 /// Non-generic queue, works for films and students both.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Queue {
+pub struct QueueItem {
     student_slack_id: String,
     film_name: String,
     role: Role,
@@ -19,13 +39,13 @@ pub struct Queue {
     created_at: DateTime<Utc>,
 }
 
-impl PartialOrd for Queue {
+impl PartialOrd for QueueItem {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for Queue {
+impl Ord for QueueItem {
     fn cmp(&self, other: &Self) -> Ordering {
         if let (Some(prio), Some(prio_other)) = (self.priority, other.priority) {
             match prio.cmp(&prio_other) {
@@ -63,15 +83,15 @@ mod tests {
             get_job("a", Priority::High, yesterday),
         ];
 
-        let mut job_queue: BinaryHeap<Queue> = jobs.clone().into_iter().collect();
+        let mut job_queue: BinaryHeap<QueueItem> = jobs.clone().into_iter().collect();
 
         while let (Some(expected), Some(actual)) = (jobs.pop(), job_queue.pop()) {
             assert_eq!(expected, actual);
         }
     }
 
-    fn get_job(name: &str, priority: Priority, date: DateTime<Utc>) -> Queue {
-        Queue {
+    fn get_job(name: &str, priority: Priority, date: DateTime<Utc>) -> QueueItem {
+        QueueItem {
             film_name: name.to_string(),
             priority: Some(priority),
             created_at: date,

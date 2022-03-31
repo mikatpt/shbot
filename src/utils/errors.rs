@@ -31,6 +31,10 @@ pub enum Error {
     JoinError(#[from] tokio::task::JoinError),
     #[error(transparent)]
     ParseError(#[from] strum::ParseError),
+    #[error(transparent)]
+    JsonError(#[from] serde_json::error::Error),
+    #[error(transparent)]
+    ReqwestError(#[from] reqwest::Error),
 }
 
 /// All error types reported to the end user.
@@ -47,12 +51,10 @@ pub enum UserError {
     // Unexpected errors
     #[error("Internal error: {0}")]
     Internal(Error),
-    #[error(transparent)]
-    JoinError(#[from] tokio::task::JoinError),
 }
 
 // Directly pass through all application error types to report to user.
-// We do not report the various specific application errors
+// We log, but do not report, the various internal application errors.
 impl From<Error> for UserError {
     fn from(e: Error) -> Self {
         type E = Error;
@@ -65,7 +67,7 @@ impl From<Error> for UserError {
     }
 }
 
-/// We log all errors during the `IntoResponse` conversion.
+/// We can use the `IntoResponse` conversion as a handy way to log errors.
 ///
 /// Note the distinction between `logging` and `reporting`: Reports are specifically for the end
 /// user, and disguise internal errors; logs are for us, and hide nothing.

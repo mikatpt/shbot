@@ -17,27 +17,36 @@ mod handlers;
 mod interceptors;
 
 /// Contains all server-wide stateful data.
-type State = Arc<InnerState>;
+pub(crate) type State = Arc<InnerState>;
 
 /// All server results must return a UserError.
 /// This allows us to report readable errors and hide internal errors.
-type Result<T> = std::result::Result<T, UserError>;
+pub type Result<T> = std::result::Result<T, UserError>;
 
 #[derive(Debug)]
-struct InnerState {
-    db: Database<PostgresClient>,
+pub(crate) struct InnerState {
+    pub(crate) db: Database<PostgresClient>,
+    pub(crate) oauth_token: String,
+    pub(crate) req_client: reqwest::Client,
 }
 
-impl InnerState {
-    fn new(db: Database<PostgresClient>) -> State {
-        Arc::new(InnerState { db })
-    }
+fn initialize_state(cfg: &Config) -> color_eyre::Result<State> {
+    let db = crate::store::new(&cfg.postgres)?;
+    let oauth_token = cfg.token.to_string();
+    let req_client = reqwest::Client::builder().build()?;
+
+    let state = InnerState {
+        db,
+        oauth_token,
+        req_client,
+    };
+
+    Ok(Arc::new(state))
 }
 
 /// Initializes server state and runs the server.
 pub async fn serve(cfg: &Config) -> color_eyre::Result<()> {
-    let db = crate::store::new(&cfg.postgres)?;
-    let state = InnerState::new(db);
+    let state = initialize_state(cfg)?;
 
     let app = new_router(state);
 
@@ -59,7 +68,7 @@ fn new_router(state: State) -> Router {
             get(handlers::list_films).post(handlers::insert_films),
         )
         .route("/films/:name", get(handlers::get_film))
-        .route("/_challenge", post(handlers::auth_challenge))
+        .route("/events", post(handlers::event_api_entrypoint))
         .route("/_health", get(health_check))
         .route("/testing", post(handlers::testing))
         .layer(Extension(state));
