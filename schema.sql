@@ -10,7 +10,7 @@ DO $schema$ BEGIN
     RAISE INFO 'Creating tables';
     CREATE TABLE IF NOT EXISTS roles (
         id              UUID PRIMARY KEY,
-        current         TEXT NOT NULL DEFAULT 'ae',
+        current         TEXT NOT NULL DEFAULT 'Ae',
         ae              TIMESTAMPTZ,
         editor          TIMESTAMPTZ,
         sound           TIMESTAMPTZ,
@@ -22,7 +22,7 @@ DO $schema$ BEGIN
         id              UUID PRIMARY KEY,
         roles_id        UUID REFERENCES roles,
         name            TEXT NOT NULL UNIQUE,
-        priority        TEXT NOT NULL DEFAULT 'high',
+        priority        TEXT NOT NULL DEFAULT 'High',
         created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
@@ -41,8 +41,8 @@ DO $schema$ BEGIN
         student_slack_id    TEXT NOT NULL,
         film_name           TEXT NOT NULL,
         role                TEXT NOT NULL,
-        created_at          TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        priority            TEXT NOT NULL DEFAULT 'high'
+        priority            TEXT NOT NULL DEFAULT 'High',
+        created_at          TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS wait_q (

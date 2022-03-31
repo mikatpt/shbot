@@ -2,6 +2,7 @@ pub mod server;
 pub mod store;
 
 mod models;
+mod queue;
 mod utils;
 
 pub use utils::{config, errors, logger};

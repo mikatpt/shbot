@@ -29,6 +29,8 @@ pub enum Error {
     CreatePool(#[from] deadpool_postgres::CreatePoolError),
     #[error(transparent)]
     JoinError(#[from] tokio::task::JoinError),
+    #[error(transparent)]
+    ParseError(#[from] strum::ParseError),
 }
 
 /// All error types reported to the end user.

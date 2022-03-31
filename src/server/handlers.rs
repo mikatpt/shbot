@@ -4,7 +4,6 @@ use axum::{
     Json,
 };
 use futures::stream::FuturesUnordered;
-
 use tracing::info;
 
 use crate::{
@@ -56,20 +55,21 @@ pub(super) async fn get_film(
 }
 
 pub(super) async fn insert_films(
-    Form(slash_command): Form<SlashRequest>,
+    form: Form<SlashRequest>,
     Extension(state): Extension<State>,
 ) -> Result<Json<SlashResponse>> {
+    let slash_command = form.0;
     let (priority, films) = slash_command
         .text
         .trim()
         .split_once(' ')
         .unwrap_or_default();
 
-    let priority: Priority = if let Ok(p) = priority.to_uppercase().parse() {
+    let priority: Priority = if let Ok(p) = priority.parse() {
         p
     } else {
         let mut msg = "I wasn't able to read your command :(\n".to_string();
-        msg += "Command format is: /insertfilms HIGH film, film, film.\n\n";
+        msg += "Command format is: /insertfilms HIGH film, film, film...\n\n";
         msg += &format!("Your command was /insertfilms {}.\n", slash_command.text);
         let res = SlashResponse::new(msg, Some(ResponseType::Ephemeral));
         return Ok(Json(res));

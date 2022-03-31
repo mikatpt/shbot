@@ -6,4 +6,4 @@ COPY ./ ./
 RUN cp ./.env.prod ./.env
 
 RUN cargo build --release
-CMD ["./target/release/shereebot"]
+CMD ["./target/release/shbot"]

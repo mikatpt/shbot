@@ -1,10 +1,12 @@
+use std::str::FromStr;
+
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use tokio_postgres::Row;
 use uuid::Uuid;
 
 use crate::{
-    models::{Film, Priority, Roles},
+    models::{Film, Priority, Role, Roles},
     store::{Client, Database, PostgresClient},
     Error, Result,
 };
@@ -34,7 +36,7 @@ impl Client for PostgresClient {
         let client = self.pool.get().await?;
 
         let stmt = "
-            SELECT f.id, f.name, f.priority, r.ae, r.editor, r.sound, r.color
+            SELECT f.id, f.name, f.priority, r.ae, r.editor, r.sound, r.color, r.current
             FROM films as f, roles as r 
             WHERE f.roles_id = r.id;";
         let stmt = client.prepare_cached(stmt).await?;
@@ -49,7 +51,7 @@ impl Client for PostgresClient {
         let client = self.pool.get().await?;
 
         let stmt = "
-            SELECT f.id, f.name, f.priority, r.ae, r.editor, r.sound, r.color
+            SELECT f.id, f.name, f.priority, r.ae, r.editor, r.sound, r.color, r.current
             FROM films as f, roles as r 
             WHERE f.name = $1
             AND f.roles_id = r.id;";
@@ -81,7 +83,7 @@ impl Client for PostgresClient {
 
         let mut film = Film::default();
         let id = &film.id;
-        let p = priority.to_string();
+        let p = priority.as_ref();
 
         let res = transaction.query(&stmt2, &[&id, &name, &p, &role_id]).await;
         if res.is_err() {
@@ -99,7 +101,7 @@ impl Client for PostgresClient {
 
         let stmt = "
             UPDATE roles
-            SET ae = $2, editor = $3, sound = $4, color = $5
+            SET ae = $2, editor = $3, sound = $4, color = $5, current = $6
             WHERE id = (
                 SELECT roles_id FROM films WHERE name = $1);";
         let stmt = client.prepare_cached(stmt).await?;
@@ -111,6 +113,7 @@ impl Client for PostgresClient {
             &film.roles.editor,
             &film.roles.sound,
             &film.roles.color,
+            &film.current_role.as_ref(),
         ]).await?;
 
         Ok(())
@@ -122,7 +125,11 @@ impl Client for PostgresClient {
 fn format_row_into_film(row: Row) -> Result<Film> {
     let id: Uuid = row.get("id");
     let name: String = row.get("name");
-    let priority: String = row.get("priority");
+    let priority = Priority::from_str(row.get("priority"))?;
+    // let priority: String = row.get("priority");
+    // let priority = Priority::from_str(&priority)?;
+    let role = Role::from_str(row.get("current"))?;
+
     let roles: [Option<DateTime<Utc>>; 4] = [
         row.get("ae"),
         row.get("editor"),
@@ -130,5 +137,5 @@ fn format_row_into_film(row: Row) -> Result<Film> {
         row.get("color"),
     ];
     let roles = Roles::new(roles[0], roles[1], roles[2], roles[3]);
-    Ok(Film::new(id, name, priority.parse()?, roles))
+    Ok(Film::new(id, name, role, priority, roles))
 }
