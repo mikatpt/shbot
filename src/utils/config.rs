@@ -7,6 +7,7 @@ use serde::Deserialize;
 pub struct Config {
     pub server: Server,
     pub postgres: deadpool_postgres::Config,
+    pub token: String,
 }
 
 #[derive(Deserialize)]
@@ -27,6 +28,11 @@ pub fn new() -> Result<Config> {
         dbname: env::var("POSTGRES_DBNAME").ok(),
         ..Default::default()
     };
+    let token = env::var("OAUTH_TOKEN")?;
 
-    Ok(Config { server, postgres })
+    Ok(Config {
+        server,
+        postgres,
+        token,
+    })
 }

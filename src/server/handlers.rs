@@ -3,24 +3,42 @@ use axum::{
     response::Html,
     Json,
 };
-use serde::Deserialize;
+use futures::stream::FuturesUnordered;
+
 use tracing::info;
 
 use crate::{
-    models::{slack::SlackSlashCommand, Film},
-    server::State,
-    Error, Result,
+    models::slack::{AppMention, AuthChallenge, ResponseType, SlashRequest, SlashResponse},
+    models::Film,
+    server::{Result, State},
+    UserError,
 };
+
+pub(super) async fn testing(Json(body): Json<AppMention>) -> Result<Json<String>> {
+    // Do some processing
+
+    // Return a payload for the app to parse.
+    Ok(Json("hey".into()))
+}
 
 pub(super) async fn home() -> Html<&'static str> {
     Html("<h1>Hello from the ShereeBot server!</h1>")
 }
 
+pub(super) async fn auth_challenge(Json(body): Json<AuthChallenge>) -> Result<String> {
+    if body.r#type != "url_verification" {
+        return Err(UserError::InvalidArg("Not an auth challenge".into()));
+    }
+    Ok(body.challenge)
+}
+
+// --------------- Films Handlers --------------- //
+
 pub(super) async fn list_films(Extension(state): Extension<State>) -> Result<Json<Vec<Film>>> {
     info!("Retrieving films...");
     match state.db.list_films().await {
         Ok(films) => Ok(Json(films)),
-        Err(e) => Err(e),
+        Err(e) => Err(e.into()),
     }
 }
 
@@ -32,30 +50,60 @@ pub(super) async fn get_film(
 
     match state.db.get_film(&name).await {
         Ok(Some(film)) => Ok(Json(film)),
-        Ok(None) => Err(Error::NotFound("do stuff")),
-        Err(e) => Err(e),
+        Ok(None) => Err(UserError::NotFound("do stuff".to_string())),
+        Err(e) => Err(e.into()),
     }
 }
 
-#[derive(Debug, Deserialize)]
-pub struct InsertFilmRequest {
-    name: String,
-}
-
-pub(super) async fn insert_film(
-    Json(film_req): Json<InsertFilmRequest>,
+pub(super) async fn insert_films(
+    Form(slash_command): Form<SlashRequest>,
     Extension(state): Extension<State>,
-) -> Result<Json<Film>> {
-    info!("inserting {}", film_req.name);
+) -> Result<Json<SlashResponse>> {
+    // Concurrently insert all films
+    let films: FuturesUnordered<_> = slash_command
+        .text
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .map(|film| {
+            let s = state.clone();
+            tokio::spawn(async move {
+                info!("inserting {}", &film);
+                s.db.insert_film(&film).await
+            })
+        })
+        .collect();
 
-    match state.db.insert_film(&film_req.name).await {
-        Ok(film) => Ok(Json(film)),
-        Err(e) => Err(e),
+    // Await all inserts to complete.
+    let results = futures::future::join_all(films).await;
+
+    let (mut success, mut fail) = (0, 0);
+    results.iter().for_each(|r| {
+        let incr = if let Ok(Err(_)) = r { (0, 1) } else { (1, 0) };
+        success += incr.0;
+        fail += incr.1;
+    });
+
+    // Write user response message.
+    let mut msg = String::new();
+    if success > 0 {
+        msg += &format!("Successfully inserted {success} film(s)!");
     }
-}
+    if success > 0 && fail > 0 {
+        msg += "\n";
+    }
+    if fail > 0 {
+        msg += "Some films were not inserted:";
+    }
 
-//text: "film1, film2, film 3,film 4 ,",
-pub(super) async fn testing(Form(slash_command): Form<SlackSlashCommand>) -> Json<&'static str> {
-    dbg!(slash_command);
-    Json("{}")
+    for res in results {
+        let res = res?;
+        if let Err(e) = res {
+            msg += "\n";
+            msg += &e.to_string();
+        }
+    }
+    let response = SlashResponse::new(msg, Some(ResponseType::Ephemeral));
+
+    Ok(Json(response))
 }

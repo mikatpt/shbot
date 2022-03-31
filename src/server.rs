@@ -11,13 +11,17 @@ use tracing::info;
 use crate::{
     config::Config,
     store::{Database, PostgresClient},
+    UserError,
 };
-use color_eyre::Result;
 mod handlers;
 mod interceptors;
 
 /// Contains all server-wide stateful data.
 type State = Arc<InnerState>;
+
+/// All server results must return a UserError.
+/// This allows us to report readable errors and hide internal errors.
+type Result<T> = std::result::Result<T, UserError>;
 
 #[derive(Debug)]
 struct InnerState {
@@ -31,7 +35,7 @@ impl InnerState {
 }
 
 /// Initializes server state and runs the server.
-pub async fn serve(cfg: &Config) -> Result<()> {
+pub async fn serve(cfg: &Config) -> color_eyre::Result<()> {
     let db = crate::store::new(&cfg.postgres)?;
     let state = InnerState::new(db);
 
@@ -52,9 +56,10 @@ fn new_router(state: State) -> Router {
         .route("/", get(handlers::home))
         .route(
             "/films",
-            get(handlers::list_films).post(handlers::insert_film),
+            get(handlers::list_films).post(handlers::insert_films),
         )
         .route("/films/:name", get(handlers::get_film))
+        .route("/_challenge", post(handlers::auth_challenge))
         .route("/_health", get(health_check))
         .route("/testing", post(handlers::testing))
         .layer(Extension(state));

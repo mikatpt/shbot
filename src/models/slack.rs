@@ -1,7 +1,24 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct SlackSlashCommand {
+pub struct AppMention {
+    r#type: String,
+    user: String,
+    text: String,
+    ts: f32,
+    channel: String,
+    event_ts: f32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AuthChallenge {
+    pub token: String,
+    pub challenge: String,
+    pub r#type: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct SlashRequest {
     pub token: String,
 
     #[serde(rename = "&team_id")]
@@ -32,3 +49,26 @@ pub struct SlackSlashCommand {
     pub api_app_id: String, // A123456,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct SlashResponse {
+    text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    response_type: Option<ResponseType>,
+}
+
+impl SlashResponse {
+    pub fn new(text: String, response_type: Option<ResponseType>) -> Self {
+        SlashResponse {
+            text,
+            response_type,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub enum ResponseType {
+    #[serde(rename = "ephemeral")]
+    Ephemeral,
+    #[serde(rename = "in_channel")]
+    InChannel,
+}

@@ -3,6 +3,7 @@ use color_eyre::eyre;
 use serde_json::json;
 use tracing::{error, warn};
 
+/// All possible application errors.
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     // User errors (expected)
@@ -11,67 +12,88 @@ pub enum Error {
     #[error("Duplicate data: {0}")]
     Duplicate(String),
     #[error("Not found: {0}")]
-    NotFound(&'static str),
+    NotFound(String),
 
     // Application errors (unexpected)
     #[error("Unknown error")]
     Unknown,
-    #[error("Internal error: {0}")]
+    #[error(transparent)]
     Internal(#[from] eyre::Error),
-    #[error("Repository error")]
+    #[error(transparent)]
     Repository(#[from] tokio_postgres::Error),
-    #[error("Internal error: {0}")]
+    #[error(transparent)]
     Server(#[from] axum::Error),
-    #[error("Internal error: {0}")]
+    #[error(transparent)]
     Pool(#[from] deadpool_postgres::PoolError),
-    #[error("Internal error: {0}")]
+    #[error(transparent)]
     CreatePool(#[from] deadpool_postgres::CreatePoolError),
+    #[error(transparent)]
+    JoinError(#[from] tokio::task::JoinError),
 }
 
-/// These are what the application reports to the end user.
+/// All error types reported to the end user.
 #[derive(thiserror::Error, Debug)]
-pub enum UserError<E: AsRef<str>> {
+pub enum UserError {
     // Expected errors
-    #[error("Invalid input")]
-    InvalidArg(E),
+    #[error("Invalid input: {0}")]
+    InvalidArg(String),
     #[error("Duplicate data: {0}")]
-    Duplicate(E),
-    #[error("Not found")]
-    NotFound(E),
+    Duplicate(String),
+    #[error("Not found: {0}")]
+    NotFound(String),
 
     // Unexpected errors
     #[error("Internal error: {0}")]
-    Internal(String),
-
+    Internal(Error),
+    #[error(transparent)]
+    JoinError(#[from] tokio::task::JoinError),
 }
 
-/// User errors logged at `warn`.
-/// Application errors logged at `error`.
-fn report_error(err: &Error) {
+// Directly pass through all application error types to report to user.
+// We do not report the various specific application errors
+impl From<Error> for UserError {
+    fn from(e: Error) -> Self {
+        type E = Error;
+        match e {
+            E::InvalidArg(s) => Self::InvalidArg(s),
+            E::Duplicate(s) => Self::Duplicate(s),
+            E::NotFound(s) => Self::NotFound(s),
+            _ => Self::Internal(e),
+        }
+    }
+}
+
+/// We log all errors during the `IntoResponse` conversion.
+///
+/// Note the distinction between `logging` and `reporting`: Reports are specifically for the end
+/// user, and disguise internal errors; logs are for us, and hide nothing.
+///
+/// User errors are logged at `warn` and application errors are logged at `error`.
+fn log_error(err: &UserError) {
+    type E = UserError;
     match err {
-        Error::InvalidArg(_) | Error::Duplicate(_) | Error::NotFound(_) => warn!("{}", err),
+        E::InvalidArg(_) | E::Duplicate(_) | E::NotFound(_) => warn!("{}", err),
         _ => error!("{}", err),
     }
 }
 
-impl IntoResponse for Error {
+// Slack requires that we always send 200's when reporting errors.
+impl IntoResponse for UserError {
     fn into_response(self) -> axum::response::Response {
-        report_error(&self);
-        let (status, error_msg) = match self {
-            Error::InvalidArg(_) | Error::Duplicate(_) | Error::NotFound(_) => {
-                (StatusCode::OK, format!("{}", self))
+        log_error(&self);
+        type E = UserError;
+        let error_msg = match self {
+            E::InvalidArg(_) | E::Duplicate(_) | E::NotFound(_) => {
+                format!("{}", self)
             }
-            Error::Unknown => (StatusCode::INTERNAL_SERVER_ERROR, format!("{}", self)),
-            _ => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Internal Error".to_string(),
-            ),
+            _ => "Internal Error! Please let Michael know.".to_string(),
         };
 
+        // TODO: Change into slack response
         let body = Json(json!({
             "error": error_msg,
         }));
 
-        (status, body).into_response()
+        (StatusCode::OK, body).into_response()
     }
 }

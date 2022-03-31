@@ -84,7 +84,7 @@ impl Client for PostgresClient {
 
         let res = transaction.query(&stmt2, &[&id, &name, &role_id]).await;
         if res.is_err() {
-            return Err(Error::Duplicate(format!("Film '{name}' already exists")));
+            return Err(Error::Duplicate(name.to_string()));
         }
         transaction.commit().await?;
 
