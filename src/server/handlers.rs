@@ -1,3 +1,5 @@
+use std::marker::Send;
+
 use axum::{
     body::Bytes,
     extract::{Extension, Form},
@@ -14,11 +16,12 @@ use crate::{
     server::{Result, State},
     slack::events::EventRequest,
     slack::slash::{ResponseType, SlashRequest, SlashResponse},
+    store::Client,
     Error, UserError,
 };
 
 /// Just for testing poorly documented slack endpoints.
-pub(super) async fn testing(body: Bytes) -> Result<Json<SlashResponse>> {
+pub(super) async fn testing<T: Client + Send>(body: Bytes) -> Result<Json<SlashResponse>> {
     debug!("{:?}", body);
 
     // Do some processing
@@ -35,9 +38,9 @@ pub(super) async fn home() -> Html<&'static str> {
 // --------------- Events API --------------- //
 
 #[tracing::instrument(skip_all)]
-pub(super) async fn events_api_entrypoint(
+pub(super) async fn events_api_entrypoint<T: Client + Send + 'static>(
     Json(request): Json<Value>,
-    Extension(state): Extension<State>,
+    Extension(state): Extension<State<T>>,
 ) -> Result<(StatusCode, String)> {
     debug!("handling event: {}", request);
 
@@ -59,10 +62,12 @@ pub(super) async fn events_api_entrypoint(
 // --------------- Films Handlers --------------- //
 
 #[tracing::instrument]
-pub(super) async fn list_films(Extension(state): Extension<State>) -> Result<Json<Vec<Film>>> {
+pub(super) async fn list_films<T: Client + Send + Sync + 'static>(
+    Extension(state): Extension<State<T>>,
+) -> Result<Json<Vec<Film>>> {
     info!("Retrieving films...");
 
-    match state.db.list_films().await {
+    match state.db.lock().await.list_films().await {
         Ok(films) => Ok(Json(films)),
         Err(e) => {
             error!("{e}");
@@ -72,9 +77,9 @@ pub(super) async fn list_films(Extension(state): Extension<State>) -> Result<Jso
 }
 
 #[tracing::instrument(skip_all)]
-pub(super) async fn insert_films(
+pub(super) async fn insert_films<T: Client + Send + Sync + 'static>(
     form: Form<SlashRequest>,
-    Extension(state): Extension<State>,
+    Extension(state): Extension<State<T>>,
 ) -> Result<Json<SlashResponse>> {
     let slash_command = form.0;
 

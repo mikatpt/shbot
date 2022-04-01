@@ -1,8 +1,10 @@
+use std::marker::Send;
+
 use serde::{Deserialize, Serialize};
 use strum::AsRefStr;
 use tracing::{debug, error, info};
 
-use crate::{server::State, Result};
+use crate::{server::State, store::Client, Result};
 
 /// This challenge is sent when the Event API first queries your event endpoint.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -59,7 +61,7 @@ impl EventRequest {
     /// Normally, we log errors right before reporting them to the user.
     /// Since this can be a long-running task, we will log errors here.
     #[tracing::instrument(skip_all)]
-    pub(crate) async fn handle_event(self, state: State) {
+    pub(crate) async fn handle_event<T: Client + Send>(self, state: State<T>) {
         info!("Handling async {} event...", self.event_type.as_ref());
         debug!("[EVENT]: {:?}", self.event);
 
@@ -74,7 +76,7 @@ impl EventRequest {
     }
 
     /// Entry gateway for mentions: branch out based on the parsed operation request.
-    async fn handle_app_mention(self, state: State) -> Result<()> {
+    async fn handle_app_mention<T: Client + Send>(self, state: State<T>) -> Result<()> {
         info!("Handling app mention");
 
         // let msg = String::from("testing first iteration of response api!");

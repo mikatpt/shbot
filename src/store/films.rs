@@ -14,23 +14,23 @@ use crate::{
 };
 
 /// Server-facing API implementation for films.
-impl Database<PostgresClient> {
-    pub async fn list_films(&self) -> Result<Vec<Film>> {
-        self.client.list_films().await
-    }
+// impl Database<PostgresClient> {
+//     pub async fn list_films(&self) -> Result<Vec<Film>> {
+//         self.client.list_films().await
+//     }
 
-    pub async fn get_film(&self, film_name: &str) -> Result<Option<Film>> {
-        self.client.get_film(film_name).await
-    }
+//     pub async fn get_film(&self, film_name: &str) -> Result<Option<Film>> {
+//         self.client.get_film(film_name).await
+//     }
 
-    pub async fn insert_film(&self, name: &str, priority: Priority) -> Result<Film> {
-        self.client.insert_film(name, priority).await
-    }
+//     pub async fn insert_film(&self, name: &str, priority: Priority) -> Result<Film> {
+//         self.client.insert_film(name, priority).await
+//     }
 
-    pub async fn update_film(&self, film: &Film) -> Result<()> {
-        self.client.update_film(film).await
-    }
-}
+//     pub async fn update_film(&self, film: &Film) -> Result<()> {
+//         self.client.update_film(film).await
+//     }
+// }
 
 #[async_trait]
 impl Client for PostgresClient {

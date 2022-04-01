@@ -10,12 +10,6 @@ use crate::{
     Result,
 };
 
-/// Returns a new Postgres database instance.
-pub(crate) fn new(cfg: &deadpool_postgres::Config) -> Result<Database<PostgresClient>> {
-    let pool = cfg.create_pool(Some(Tokio1), NoTls)?;
-    Ok(Database::new(pool))
-}
-
 /// Server-facing API boundary.
 //
 // You should implement all methods from the `Client` trait on this struct for each new client.
@@ -23,8 +17,8 @@ pub(crate) fn new(cfg: &deadpool_postgres::Config) -> Result<Database<PostgresCl
 // This is not statically checked; that would require us writing and implementing an external
 // trait, which just isn't done in Rust; you'd have to import the trait on every usage.
 #[derive(Debug)]
-pub(crate) struct Database<C: Client> {
-    client: C,
+pub(crate) struct Database<T: Client + Send> {
+    client: T,
 }
 
 #[async_trait]
@@ -48,12 +42,32 @@ pub(crate) struct PostgresClient {
     pool: Pool,
 }
 
+impl<T: Client + Send> Database<T> {
+    pub async fn list_films(&self) -> Result<Vec<Film>> {
+        self.client.list_films().await
+    }
+
+    pub async fn get_film(&self, film_name: &str) -> Result<Option<Film>> {
+        self.client.get_film(film_name).await
+    }
+
+    pub async fn insert_film(&self, name: &str, priority: Priority) -> Result<Film> {
+        self.client.insert_film(name, priority).await
+    }
+
+    pub async fn update_film(&self, film: &Film) -> Result<()> {
+        self.client.update_film(film).await
+    }
+}
+
 // Server-facing API implementation for Postgres.
 // Implementation is split between files on model boundaries.
 impl Database<PostgresClient> {
-    pub fn new(pool: Pool) -> Self {
+    /// Returns a new Postgres database instance.
+    pub fn new(cfg: &deadpool_postgres::Config) -> Result<Self> {
+        let pool = cfg.create_pool(Some(Tokio1), NoTls)?;
         let client = PostgresClient { pool };
-        Database { client }
+        Ok(Database { client })
     }
 }
 

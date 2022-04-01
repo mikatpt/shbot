@@ -3,18 +3,19 @@ use std::str::FromStr;
 use crate::{
     models::{Film, Priority},
     server::State,
+    store::Client,
     Error, Result,
 };
 
 use futures::{future, stream::FuturesUnordered};
 use tracing::{error, info};
 
-pub struct FilmManager {
-    state: State,
+pub(crate) struct FilmManager<T: Client + Send> {
+    state: State<T>,
 }
 
-impl FilmManager {
-    pub(crate) fn new(state: State) -> Self {
+impl<T: Client + Send + Sync + 'static> FilmManager<T> {
+    pub(crate) fn new(state: State<T>) -> Self {
         Self { state }
     }
 
@@ -32,9 +33,10 @@ impl FilmManager {
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty())
             .map(|film_name| {
-                let s = self.state.clone();
+                let db = self.state.db.clone();
                 tokio::spawn(async move {
-                    s.db.insert_film(&film_name, priority)
+                    let a = db.lock().await;
+                    a.insert_film(&film_name, priority)
                         .await
                         .map_err(|e| -> Error {
                             error!("{e}");

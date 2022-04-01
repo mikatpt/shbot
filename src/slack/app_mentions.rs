@@ -1,13 +1,16 @@
 #![allow(dead_code)]
+use std::marker::Send;
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 use strum::EnumString;
 
-use crate::{films::FilmManager, server::State, slack::events::Event, Error, Result};
+use crate::{
+    films::FilmManager, server::State, slack::events::Event, store::Client, Error, Result,
+};
 
-pub(crate) struct AppMention {
-    state: State,
+pub(crate) struct AppMention<T: Client + Send> {
+    state: State<T>,
 }
 pub(crate) async fn handle_event(event: Event) -> Result<Response> {
     #[rustfmt::skip]
@@ -16,8 +19,8 @@ pub(crate) async fn handle_event(event: Event) -> Result<Response> {
     todo!();
 }
 
-impl AppMention {
-    pub(crate) fn new(state: State) -> Self {
+impl<T: Client + Send> AppMention<T> {
+    pub(crate) fn new(state: State<T>) -> Self {
         Self { state }
     }
 

@@ -6,37 +6,39 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use futures::lock::Mutex;
 use tracing::info;
 
 use crate::{
     config::Config,
-    store::{Database, PostgresClient},
+    store::{Client, Database, PostgresClient},
     UserError,
 };
 mod handlers;
 mod interceptors;
 
 /// Contains all server-wide stateful data.
-pub(crate) type State = Arc<InnerState>;
+pub(crate) type State<T: Client> = Arc<InnerState<T>>;
 
 /// All server results must return a UserError.
 /// This allows us to report readable errors and hide internal errors.
 pub type Result<T> = std::result::Result<T, UserError>;
 
-pub(crate) struct InnerState {
-    pub(crate) db: Database<PostgresClient>,
+pub(crate) struct InnerState<T: Client + Send> {
+    pub(crate) db: Arc<Mutex<Database<T>>>,
     pub(crate) oauth_token: String,
     pub(crate) req_client: reqwest::Client,
 }
 
-impl std::fmt::Debug for InnerState {
+impl<T: Client + Send> std::fmt::Debug for InnerState<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("<State>").finish()
     }
 }
 
-fn initialize_state(cfg: &Config) -> color_eyre::Result<State> {
-    let db = crate::store::new(&cfg.postgres)?;
+fn initialize_state(cfg: &Config) -> color_eyre::Result<State<PostgresClient>> {
+    let db = crate::store::Database::new(&cfg.postgres)?;
+    let db = Arc::new(Mutex::new(db));
     let oauth_token = cfg.token.to_string();
     let req_client = reqwest::Client::builder().build()?;
 
@@ -65,16 +67,16 @@ pub async fn serve(cfg: &Config) -> color_eyre::Result<()> {
 }
 
 /// Initialize axum app and attach all routes.
-fn new_router(state: State) -> Router {
+fn new_router<T: Client + Send + Sync + 'static>(state: State<T>) -> Router {
     let app = Router::new()
         .route("/", get(handlers::home))
         .route(
             "/films",
-            get(handlers::list_films).post(handlers::insert_films),
+            get(handlers::list_films::<T>).post(handlers::insert_films::<T>),
         )
-        .route("/events", post(handlers::events_api_entrypoint))
+        .route("/events", post(handlers::events_api_entrypoint::<T>))
         .route("/_health", get(health_check))
-        .route("/testing", post(handlers::testing))
+        .route("/testing", post(handlers::testing::<T>))
         .layer(Extension(state));
 
     interceptors::attach(app)
