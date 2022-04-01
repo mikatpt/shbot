@@ -23,11 +23,16 @@ pub(crate) type State = Arc<InnerState>;
 /// This allows us to report readable errors and hide internal errors.
 pub type Result<T> = std::result::Result<T, UserError>;
 
-#[derive(Debug)]
 pub(crate) struct InnerState {
     pub(crate) db: Database<PostgresClient>,
     pub(crate) oauth_token: String,
     pub(crate) req_client: reqwest::Client,
+}
+
+impl std::fmt::Debug for InnerState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("<State>").finish()
+    }
 }
 
 fn initialize_state(cfg: &Config) -> color_eyre::Result<State> {
@@ -67,8 +72,7 @@ fn new_router(state: State) -> Router {
             "/films",
             get(handlers::list_films).post(handlers::insert_films),
         )
-        .route("/films/:name", get(handlers::get_film))
-        .route("/events", post(handlers::event_api_entrypoint))
+        .route("/events", post(handlers::events_api_entrypoint))
         .route("/_health", get(health_check))
         .route("/testing", post(handlers::testing))
         .layer(Extension(state));

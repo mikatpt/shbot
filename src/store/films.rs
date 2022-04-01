@@ -1,8 +1,10 @@
+#![allow(dead_code)]
 use std::str::FromStr;
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use tokio_postgres::Row;
+use tracing::info;
 use uuid::Uuid;
 
 use crate::{
@@ -91,6 +93,7 @@ impl Client for PostgresClient {
         }
         transaction.commit().await?;
 
+        info!("Inserted film: {}", name);
         film.name = name.to_string();
 
         Ok(film)
@@ -116,6 +119,8 @@ impl Client for PostgresClient {
             &film.current_role.as_ref(),
         ]).await?;
 
+        info!("Updated film: {}", film.name);
+
         Ok(())
     }
 }
@@ -126,8 +131,6 @@ fn format_row_into_film(row: Row) -> Result<Film> {
     let id: Uuid = row.get("id");
     let name: String = row.get("name");
     let priority = Priority::from_str(row.get("priority"))?;
-    // let priority: String = row.get("priority");
-    // let priority = Priority::from_str(&priority)?;
     let role = Role::from_str(row.get("current"))?;
 
     let roles: [Option<DateTime<Utc>>; 4] = [

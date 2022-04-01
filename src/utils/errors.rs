@@ -1,7 +1,6 @@
 use axum::{http::StatusCode, response::IntoResponse, Json};
 use color_eyre::eyre;
 use serde_json::json;
-use tracing::{error, warn};
 
 /// All possible application errors.
 #[derive(thiserror::Error, Debug)]
@@ -67,24 +66,9 @@ impl From<Error> for UserError {
     }
 }
 
-/// We can use the `IntoResponse` conversion as a handy way to log errors.
-///
-/// Note the distinction between `logging` and `reporting`: Reports are specifically for the end
-/// user, and disguise internal errors; logs are for us, and hide nothing.
-///
-/// User errors are logged at `warn` and application errors are logged at `error`.
-fn log_error(err: &UserError) {
-    type E = UserError;
-    match err {
-        E::InvalidArg(_) | E::Duplicate(_) | E::NotFound(_) => warn!("{}", err),
-        _ => error!("{}", err),
-    }
-}
-
 // Slack requires that we always send 200's when reporting errors.
 impl IntoResponse for UserError {
     fn into_response(self) -> axum::response::Response {
-        log_error(&self);
         type E = UserError;
         let error_msg = match self {
             E::InvalidArg(_) | E::Duplicate(_) | E::NotFound(_) => {

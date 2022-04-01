@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use strum::{AsRefStr, EnumString};
@@ -50,6 +52,7 @@ impl Film {
     ) -> Self {
         Film { id, name, current_role, priority, roles }
     }
+
     pub fn add_next_role(&mut self) -> bool {
         self.roles.add_next_role()
     }
@@ -68,18 +71,14 @@ impl Default for Film {
 }
 
 impl Roles {
+    #[rustfmt::skip]
     pub fn new(
         ae: Option<DateTime<Utc>>,
         editor: Option<DateTime<Utc>>,
         sound: Option<DateTime<Utc>>,
         color: Option<DateTime<Utc>>,
     ) -> Roles {
-        Roles {
-            ae,
-            editor,
-            sound,
-            color,
-        }
+        Roles { ae, editor, sound, color }
     }
 
     /// Returns false if all roles have been worked.

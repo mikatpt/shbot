@@ -32,18 +32,11 @@ pub(crate) fn attach(router: Router) -> Router {
                 })
                 .on_request(|_request: &Request<_>, _span: &Span| {})
                 .on_response(|response: &Response, latency: Duration, _span: &Span| {
+                    let s = response.status();
                     match latency.as_micros() {
-                        0..=999 => debug!(
-                            "[{}] Served in {}μs",
-                            response.status(),
-                            latency.as_micros()
-                        ),
-                        1000..=999999 => debug!(
-                            "[{}] Served in {}ms",
-                            response.status(),
-                            latency.as_millis()
-                        ),
-                        _ => debug!("[{}] Served in {}s", response.status(), latency.as_secs()),
+                        0..=999 => debug!("[{}] Served in {}μs", s, latency.as_micros()),
+                        1000..=999999 => debug!("[{}] Served in {}ms", s, latency.as_millis()),
+                        _ => debug!("[{}] Served in {}s", s, latency.as_secs()),
                     };
                 })
                 .on_body_chunk(|_chunk: &Bytes, _latency: Duration, _span: &Span| {

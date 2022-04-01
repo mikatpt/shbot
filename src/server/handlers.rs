@@ -1,22 +1,19 @@
 use axum::{
     body::Bytes,
-    extract::{Extension, Form, Path},
+    extract::{Extension, Form},
     http::StatusCode,
     response::Html,
     Json,
 };
-use futures::stream::FuturesUnordered;
 use serde_json::Value;
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 
 use crate::{
-    models::{Film, Priority},
+    films::FilmManager,
+    models::Film,
     server::{Result, State},
+    slack::events::EventRequest,
     slack::slash::{ResponseType, SlashRequest, SlashResponse},
-    slack::{
-        self,
-        events::{EventRequest, EventType},
-    },
     Error, UserError,
 };
 
@@ -35,21 +32,24 @@ pub(super) async fn home() -> Html<&'static str> {
     Html("<h1>Hello from the ShereeBot server!</h1>")
 }
 
-// --------------- Event API --------------- //
+// --------------- Events API --------------- //
 
-pub(super) async fn event_api_entrypoint(
+#[tracing::instrument(skip_all)]
+pub(super) async fn events_api_entrypoint(
     Json(request): Json<Value>,
     Extension(state): Extension<State>,
 ) -> Result<(StatusCode, String)> {
     debug!("handling event: {}", request);
 
-    if let Some(r) = request.get("type") {
-        if Some("url_verification") == r.as_str() {
-            return Ok((StatusCode::OK, slack::auth_challenge(request)?));
-        }
+    if let Some(challenge) = request.get("challenge") {
+        info!("Auth challenge received");
+        return Ok((StatusCode::OK, challenge.to_string()));
     }
 
-    let request: EventRequest = serde_json::from_value(request).map_err(Into::<Error>::into)?;
+    let request: EventRequest = serde_json::from_value(request).map_err(|e| -> Error {
+        error!("{e}");
+        e.into()
+    })?;
 
     tokio::spawn(request.handle_event(state));
 
@@ -58,73 +58,39 @@ pub(super) async fn event_api_entrypoint(
 
 // --------------- Films Handlers --------------- //
 
+#[tracing::instrument]
 pub(super) async fn list_films(Extension(state): Extension<State>) -> Result<Json<Vec<Film>>> {
     info!("Retrieving films...");
 
     match state.db.list_films().await {
         Ok(films) => Ok(Json(films)),
-        Err(e) => Err(e.into()),
+        Err(e) => {
+            error!("{e}");
+            Err(e.into())
+        }
     }
 }
 
-pub(super) async fn get_film(
-    Path(name): Path<String>,
-    Extension(state): Extension<State>,
-) -> Result<Json<Film>> {
-    info!("Retrieving film {name}");
-
-    match state.db.get_film(&name).await {
-        Ok(Some(film)) => Ok(Json(film)),
-        Ok(None) => Err(UserError::NotFound("do stuff".to_string())),
-        Err(e) => Err(e.into()),
-    }
-}
-
+#[tracing::instrument(skip_all)]
 pub(super) async fn insert_films(
     form: Form<SlashRequest>,
     Extension(state): Extension<State>,
 ) -> Result<Json<SlashResponse>> {
     let slash_command = form.0;
 
-    let (priority, films) = slash_command
-        .text
-        .trim()
-        .split_once(' ')
-        .unwrap_or_default();
-
-    info!("Inserting {priority} prio films:");
-    info!("{films:?}");
-
-    let priority: Priority = if let Ok(p) = priority.parse() {
-        p
-    } else {
-        let mut msg = "I wasn't able to read your command :(\n".to_string();
-        msg += "Command format is: /insertfilms HIGH film, film, film...\n\n";
-        msg += &format!("Your command was /insertfilms {}.\n", slash_command.text);
-        let res = SlashResponse::new(msg, Some(ResponseType::Ephemeral));
-        return Ok(Json(res));
+    let manager = FilmManager::new(state);
+    let results = match manager.insert_films(&slash_command.text).await {
+        Ok(r) => r,
+        Err(e) => {
+            let err = UserError::from(e);
+            let res = SlashResponse::new(format!("{}", err), Some(ResponseType::Ephemeral));
+            return Ok(Json(res));
+        }
     };
-
-    // Concurrently insert all films
-    let films: FuturesUnordered<_> = films
-        .split(',')
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .map(|film| {
-            let s = state.clone();
-            tokio::spawn(async move {
-                info!("inserting {}", &film);
-                s.db.insert_film(&film, priority).await
-            })
-        })
-        .collect();
-
-    // Await all inserts to complete.
-    let results = futures::future::join_all(films).await;
 
     let (mut success, mut fail) = (0, 0);
     results.iter().for_each(|r| {
-        let incr = if let Ok(Err(_)) = r { (0, 1) } else { (1, 0) };
+        let incr = if r.is_err() { (0, 1) } else { (1, 0) };
         success += incr.0;
         fail += incr.1;
     });
@@ -135,7 +101,7 @@ pub(super) async fn insert_films(
         msg += &format!("Successfully inserted {success} film(s):\n");
     }
 
-    for res in results.iter().flatten().flatten() {
+    for res in results.iter().flatten() {
         msg += &format!("{}, ", res.name);
     }
     if success > 0 {
@@ -151,7 +117,6 @@ pub(super) async fn insert_films(
     }
 
     for res in results {
-        let res = res.map_err(Into::<Error>::into)?;
         if let Err(e) = res {
             msg += "\n";
             msg += &e.to_string();

@@ -80,29 +80,40 @@ impl Logger {
             None => BoxMakeWriter::new(io::stdout),
         };
 
+        let environment = env::var("ENVIRONMENT")?;
+
         // Format time and logs into the format_layer for display.
 
         let time_format = "[year]-[month]-[day] [hour]:[minute]:[second].[subsecond digits:2]";
         let time_format = format_description::parse(time_format)?;
         let timer = fmt::time::UtcTime::new(time_format);
 
-        let mut log_format = fmt::format().with_timer(timer);
+        let mut prod_fmt = fmt::format().with_timer(timer.clone());
+        let mut local_fmt = fmt::format().pretty().with_timer(timer);
+
         // Disable colors when logging to files.
         if should_write_to_file {
-            log_format = log_format.with_ansi(false);
+            local_fmt = local_fmt.with_ansi(false);
+            prod_fmt = prod_fmt.with_ansi(false);
         }
 
-        let format_layer = fmt::layer().event_format(log_format).with_writer(writer);
         // let console_layer = console_subscriber::ConsoleLayer::builder().spawn();
 
         // Finally, the registry tracks tracing spans. We wrap the env layer and format layer and
         // it handles the rest, for the most part.
-        Registry::default()
+        let registry = Registry::default()
             .with(self.env_filter)
-            .with(format_layer)
-            .with(ErrorLayer::default())
             // .with(console_layer)
-            .init();
+            .with(ErrorLayer::default());
+
+        if environment == "local" {
+            let local_fmt = fmt::layer().event_format(local_fmt).with_writer(writer);
+            registry.with(local_fmt).init();
+        } else {
+            let format_layer = fmt::layer().event_format(prod_fmt).with_writer(writer);
+            registry.with(format_layer).init();
+        }
+
         Ok(())
     }
 }
