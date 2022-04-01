@@ -88,7 +88,7 @@ impl<T: Client> FilmManager<T> {
 
         if !successes.is_empty() {
             msg += &format!("Successfully inserted {} films(s)!\n", successes.len());
-            successes.iter().intersperse(&", ").for_each(|s| msg += s);
+            Itertools::intersperse(successes.iter(), &", ").for_each(|s| msg += s);
         }
 
         if film_names.len() - successes.len() > 0 {
@@ -96,7 +96,7 @@ impl<T: Client> FilmManager<T> {
                 msg += "\n";
             }
             msg += "Skipped duplicate films:\n";
-            fails.intersperse(", ").for_each(|s| msg += s);
+            Itertools::intersperse(fails, ", ").for_each(|s| msg += s);
         }
 
         msg

@@ -63,7 +63,8 @@ impl<T: Client> AppMention<T> {
         match cmd {
             Command::AddFilms => {
                 let manager = FilmManager::new(self.db.clone());
-                let msg: String = text.split_whitespace().skip(2).intersperse(" ").collect();
+                let msg: String =
+                    Itertools::intersperse(text.split_whitespace().skip(2), " ").collect();
                 manager.insert_films(&msg).await
             }
             Command::RequestWork => "unimplemented".to_string(),

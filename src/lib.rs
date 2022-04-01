@@ -1,4 +1,3 @@
-#![allow(unstable_name_collisions)]
 pub mod server;
 pub mod store;
 
