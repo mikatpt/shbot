@@ -15,7 +15,7 @@ use crate::{
     slack::events::EventRequest,
     slack::slash::{ResponseType, SlashRequest, SlashResponse},
     store::Client,
-    Error, UserError,
+    Error,
 };
 
 /// Just for testing poorly documented slack endpoints.
@@ -82,13 +82,8 @@ pub(super) async fn insert_films<T: Client>(
     let slash_command = form.0;
 
     let manager = FilmManager::new(state.db.clone());
-    let res = match manager.insert_films(&slash_command.text).await {
-        Ok(r) => SlashResponse::new(r, Some(ResponseType::Ephemeral)),
-        Err(e) => {
-            let err = UserError::from(e);
-            SlashResponse::new(format!("{}", err), Some(ResponseType::Ephemeral))
-        }
-    };
+    let msg = manager.insert_films(&slash_command.text).await;
+    let res = SlashResponse::new(msg, Some(ResponseType::Ephemeral));
 
     Ok(Json(res))
 }

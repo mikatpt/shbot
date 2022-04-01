@@ -15,7 +15,7 @@ pub struct Film {
 }
 
 #[derive(Debug, Clone, Copy, AsRefStr, EnumString, Deserialize, Serialize)]
-#[strum(ascii_case_insensitive)]
+#[strum(serialize_all = "mixed_case")]
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub enum Priority {
     Low,
@@ -32,7 +32,7 @@ pub struct Roles {
 }
 
 #[derive(AsRefStr, EnumString, Deserialize, Serialize, Debug, Clone, Copy)]
-#[strum(ascii_case_insensitive)]
+#[strum(serialize_all = "mixed_case")]
 #[derive(PartialEq, Eq)]
 pub enum Role {
     Ae,

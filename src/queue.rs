@@ -1,12 +1,14 @@
 use std::collections::BinaryHeap;
-use std::{
-    cmp::Ordering,
-    sync::{Arc, Mutex},
-};
+use std::{cmp::Ordering, sync::Arc};
 
 use chrono::{DateTime, Utc};
+use futures::lock::Mutex;
 
-use crate::models::{Priority, Role};
+use crate::{
+    models::{Priority, Role},
+    store::{Client, Database},
+    Result,
+};
 
 #[derive(Debug, Default)]
 pub struct Queue {
@@ -14,29 +16,27 @@ pub struct Queue {
     pub wait_q: Q,
 }
 
-// pub fn thing() {
-//     let q = Queue::default();
-//     let a = q.film_q.clone();
-//     let b = a.lock().unwrap();
-//     a.lock().unwrap().push(QueueItem {
-//         student_slack_id: "".to_owned(),
-//         film_name: "".to_owned(),
-//         role: Role::Ae,
-//         priority: None,
-//         created_at: Utc::now(),
-//     });
-// }
+impl Queue {
+    pub(crate) async fn from_db<T: Client>(db: Database<T>) -> Result<Queue> {
+        let wait_q = db.get_queue(true).await?.into_iter().collect();
+        let film_q = db.get_queue(false).await?.into_iter().collect();
+        Ok(Self {
+            film_q: Arc::new(Mutex::new(film_q)),
+            wait_q: Arc::new(Mutex::new(wait_q)),
+        })
+    }
+}
 
 type Q = Arc<Mutex<BinaryHeap<QueueItem>>>;
 
 /// Non-generic queue, works for films and students both.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct QueueItem {
-    student_slack_id: String,
-    film_name: String,
-    role: Role,
-    priority: Option<Priority>,
-    created_at: DateTime<Utc>,
+    pub student_slack_id: String,
+    pub film_name: String,
+    pub role: Role,
+    pub priority: Option<Priority>,
+    pub created_at: DateTime<Utc>,
 }
 
 impl PartialOrd for QueueItem {

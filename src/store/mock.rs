@@ -5,6 +5,7 @@ use color_eyre::eyre::eyre;
 
 use crate::{
     models::{Film, Priority},
+    queue::QueueItem,
     store::{Client, Database},
     Error, Result,
 };
@@ -49,6 +50,13 @@ impl Client for MockClient {
         if self.success {
             return Ok(());
         }
+        Err(Error::Internal(eyre!("sample error")))
+    }
+
+    async fn get_queue(&self, wait: bool) -> Result<Vec<QueueItem>> {
+        // if self.success {
+        //     return Ok(vec![QueueItem])
+        // }
         Err(Error::Internal(eyre!("sample error")))
     }
 

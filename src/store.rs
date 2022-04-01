@@ -6,6 +6,7 @@ use tokio_postgres::NoTls;
 
 use crate::{
     models::{Film, Priority},
+    queue::QueueItem,
     Result,
 };
 
@@ -34,6 +35,8 @@ pub(crate) trait Client: Send + Sync + 'static {
     async fn insert_film(&self, name: &str, priority: Priority) -> Result<Film>;
 
     async fn update_film(&self, film: &Film) -> Result<()>;
+
+    async fn get_queue(&self, wait: bool) -> Result<Vec<QueueItem>>;
 
     fn clone(&self) -> Self;
 }
@@ -65,6 +68,10 @@ impl<T: Client> Database<T> {
     /// Updates a film
     pub async fn update_film(&self, film: &Film) -> Result<()> {
         self.client.update_film(film).await
+    }
+
+    pub async fn get_queue(&self, wait: bool) -> Result<Vec<QueueItem>> {
+        self.client.get_queue(wait).await
     }
 }
 

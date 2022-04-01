@@ -10,6 +10,7 @@ use uuid::Uuid;
 
 use crate::{
     models::{Film, Priority, Role, Roles},
+    queue::QueueItem,
     store::Client,
     Error, Result,
 };
@@ -115,6 +116,42 @@ impl Client for PostgresClient {
         info!("Updated film: {}", film.name);
 
         Ok(())
+    }
+
+    async fn get_queue(&self, wait: bool) -> Result<Vec<QueueItem>> {
+        let client = self.pool.get().await?;
+
+        let stmt = if wait {
+            "SELECT * from wait_q;"
+        } else {
+            "SELECT * from jobs_q;"
+        };
+
+        let stmt = client.prepare_cached(stmt).await?;
+
+        let rows = client.query(&stmt, &[]).await?;
+        let mut res = vec![];
+        for row in rows {
+            let student_slack_id: String = row.get("student_slack_id");
+            let film_name: String = row.get("film_name");
+            let role = Role::from_str(row.get("role"))?;
+            let p: Option<String> = row.get("priority");
+            let priority = match p {
+                Some(pr) => Some(Priority::from_str(&pr)?),
+                None => None,
+            };
+            let created_at: DateTime<Utc> = row.get("created_at");
+
+            let item = QueueItem {
+                student_slack_id,
+                film_name,
+                role,
+                priority,
+                created_at,
+            };
+            res.push(item);
+        }
+        Ok(res)
     }
 
     fn clone(&self) -> Self {

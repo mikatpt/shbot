@@ -10,6 +10,7 @@ use tracing::info;
 
 use crate::{
     config::Config,
+    queue::Queue,
     store::{Client, Database, PostgresClient},
     UserError,
 };
@@ -27,6 +28,7 @@ pub(crate) struct InnerState<T: Client> {
     pub(crate) db: Database<T>,
     pub(crate) oauth_token: String,
     pub(crate) req_client: reqwest::Client,
+    pub(crate) queue: Queue,
 }
 
 impl<T: Client> std::fmt::Debug for InnerState<T> {
@@ -35,15 +37,17 @@ impl<T: Client> std::fmt::Debug for InnerState<T> {
     }
 }
 
-fn initialize_state(cfg: &Config) -> color_eyre::Result<State<PostgresClient>> {
+async fn initialize_state(cfg: &Config) -> color_eyre::Result<State<PostgresClient>> {
     let db = crate::store::Database::<PostgresClient>::new(&cfg.postgres)?;
     let oauth_token = cfg.token.to_string();
     let req_client = reqwest::Client::builder().build()?;
+    let queue = Queue::from_db(db.clone()).await?;
 
     let state = InnerState {
         db,
         oauth_token,
         req_client,
+        queue,
     };
 
     Ok(Arc::new(state))
@@ -51,7 +55,7 @@ fn initialize_state(cfg: &Config) -> color_eyre::Result<State<PostgresClient>> {
 
 /// Initializes server state and runs the server.
 pub async fn serve(cfg: &Config) -> color_eyre::Result<()> {
-    let state = initialize_state(cfg)?;
+    let state = initialize_state(cfg).await?;
 
     let app = new_router(state);
 
