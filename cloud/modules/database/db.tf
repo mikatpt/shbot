@@ -3,6 +3,7 @@ data "template_file" "cloud_init" {
 
     vars = {
         postgres_pass = sensitive(file("./modules/database/.env"))
+        public_key    = var.public_key
     }
 }
 

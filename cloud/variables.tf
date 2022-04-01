@@ -1,5 +1,5 @@
 variable "vpc_id" {
-    default = "***REMOVED***"
+    type = string
 }
 
 variable "infra_version" {
@@ -18,6 +18,6 @@ variable "enable_blue" {
     default     = true
 }
 
-variable "ecr_api_image" {
-    default = "***REMOVED***/shbot_api"
+variable "ecr_url" {
+    type    = string
 }

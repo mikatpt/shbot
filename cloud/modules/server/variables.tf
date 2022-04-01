@@ -26,9 +26,13 @@ variable "enable_blue" {
     type        = bool
 }
 
-variable "ecr_api_image" {
-    description = "ECR Image to pull"
+variable "ecr_url" {
+    description = "ECR URL to pull from"
     type        = string
+}
+
+variable "public_key" {
+    type = string
 }
 
 variable "public_key_name" {

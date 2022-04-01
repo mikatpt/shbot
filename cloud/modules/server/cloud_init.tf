@@ -2,8 +2,9 @@ data "template_file" "cloud_init" {
     template = file("./modules/server/cloud_init.yml")
 
     vars = {
-        ecr_img     = var.ecr_api_image
+        ecr_url     = var.ecr_url
         api_name    = var.api_name
+        public_key  = var.public_key
     }
 }
 

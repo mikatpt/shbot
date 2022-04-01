@@ -38,7 +38,8 @@ module "server" {
     infra_version       = var.infra_version
     enable_green        = var.enable_green
     enable_blue         = var.enable_blue
-    ecr_api_image       = "***REMOVED***/shbot_api"
+    ecr_url             = var.ecr_url
+    public_key          = aws_key_pair.shbot_api.public_key
     public_key_name     = aws_key_pair.shbot_api.key_name
     public_subnet_ids   = aws_subnet.public.*.id
 }
@@ -49,6 +50,7 @@ module "database" {
 
     vpc_id              = var.vpc_id
     infra_version       = var.infra_version
+    public_key          = aws_key_pair.shbot_api.public_key
     public_key_name     = aws_key_pair.shbot_api.key_name
     private_subnet_id   = aws_subnet.private.id
 }

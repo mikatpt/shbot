@@ -9,7 +9,7 @@ users:
     ssh_import_id:
     lock_passwd: false
     ssh_authorized_keys:
-      - ***REMOVED***
+      - ${public_key}
 
 #### Install docker and aws-cli using apt
 # https://stackoverflow.com/questions/24418815/how-do-i-install-docker-using-cloud-init
@@ -53,8 +53,8 @@ system_info:
 # Since we set an IAM profile on the instance, those credentials will automatically be used
 runcmd:
   - aws configure set region us-east-1
-  - aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${ecr_img}
-  - docker pull ${ecr_img}:latest
-  - docker tag ${ecr_img}:latest ${api_name}:latest
-  - docker rmi ${ecr_img}:latest
-  - docker run -d -p 80:7070 --name shbot_api ${api_name}:latest
+  - aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${ecr_url}
+  - docker pull ${ecr_url}/${api_name}:latest
+  - docker tag ${ecr_url}/${api_name}:latest ${api_name}:latest
+  - docker rmi ${ecr_url}/${api_name}:latest
+  - docker run -d -p 80:7070 --name ${api_name} ${api_name}:latest

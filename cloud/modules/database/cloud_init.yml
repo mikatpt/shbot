@@ -9,7 +9,7 @@ users:
     ssh_import_id:
     lock_passwd: false
     ssh_authorized_keys:
-      - ***REMOVED***
+      - ${public_key}
 
 packages:
   - apt-transport-https

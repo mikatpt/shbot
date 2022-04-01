@@ -29,6 +29,10 @@ _info "Setting postgres host"
 DB_IP=$(terraform show -json | jq '.values.outputs.db_ip.value' | sed 's/"//g')
 
 cd ../
+
+_info "sourcing variables"
+source .env
+
 sed -i "s/POSTGRES_HOST.*/POSTGRES_HOST=${DB_IP}/" ./.env.prod
 
 _info "Building docker image"
@@ -38,11 +42,12 @@ _info "Cleaning up old images"
 docker image prune -f
 
 _info "Authenticating with docker"
-aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ***REMOVED***
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin
+${TF_VAR_ecr_url}
 
 _info "Pushing image to docker"
-docker tag shbot_api ***REMOVED***/shbot_api:latest
-docker push ***REMOVED***/shbot_api:latest
+docker tag shbot_api ${TF_VAR_ecr_image}
+docker push ${TF_VAR_ecr_image}
 
 cd cloud
 PREV_ENV=$(terraform show -json | jq '.values.outputs.env.value' | sed 's/"//g')
