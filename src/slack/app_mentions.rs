@@ -1,27 +1,24 @@
 #![allow(dead_code)]
-use std::marker::Send;
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 use strum::EnumString;
 
 use crate::{
-    films::FilmManager, server::State, slack::events::Event, store::Client, Error, Result,
+    films::FilmManager,
+    slack::events::Event,
+    store::{Client, Database},
+    Error, Result,
 };
 
-pub(crate) struct AppMention<T: Client + Send> {
-    state: State<T>,
-}
-pub(crate) async fn handle_event(event: Event) -> Result<Response> {
-    #[rustfmt::skip]
-    let Event::AppMention { user, text, ts, channel, .. } = event;
-
-    todo!();
+/// Manager which handles all app_mention events.
+pub(crate) struct AppMention<T: Client> {
+    db: Database<T>,
 }
 
-impl<T: Client + Send> AppMention<T> {
-    pub(crate) fn new(state: State<T>) -> Self {
-        Self { state }
+impl<T: Client> AppMention<T> {
+    pub(crate) fn new(db: Database<T>) -> Self {
+        Self { db }
     }
 
     /// Given an app_mention event, does the following:
@@ -31,39 +28,41 @@ impl<T: Client + Send> AppMention<T> {
     /// 3. Returns a formatted `Response` with either an error or success msg
     pub(crate) async fn handle_event(&self, event: Event) -> Result<Response> {
         #[rustfmt::skip]
-        let Event::AppMention { user, text, ts, channel, .. } = event;
+        let Event::AppMention { text, ts, channel, .. } = event;
+        let cmd = match self.parse_command(&text) {
+            Ok(c) => c,
+            Err(e) => return Ok(Response::new(channel, e.to_string(), Some(ts))),
+        };
 
-        todo!();
+        match self.run_command(cmd, text).await {
+            Ok(msg) => Ok(Response::new(channel, msg, Some(ts))),
+            Err(e) => Ok(Response::new(channel, e.to_string(), Some(ts))),
+        }
     }
 
     /// Parse the event text for a command.
     ///
     /// Format: "<USER_ID> COMMAND MESSAGE"
     /// Example: "<@U0LAN0Z89> addfilms star wars, star trek"
-    // fn parse_command(text: String) -> Result<Command> {
-    //     let cmd = text
-    //         .split_whitespace()
-    //         .nth(1)
-    //         .ok_or_else(|| Error::InvalidArg("Couldn't read your command!".into()))?;
+    fn parse_command(&self, text: &str) -> Result<Command> {
+        let cmd = text
+            .split_whitespace()
+            .nth(1)
+            .ok_or_else(|| Error::InvalidArg("Couldn't read your command!".into()))?;
 
-    //     Ok(Command::from_str(cmd)?)
-    // }
-    // fn run_command(cmd: Command) -> Result<String> {
-    //     match cmd {
-    //         Command::AddFilms => {
-    //             let manager = FilmManager::new
+        Ok(Command::from_str(cmd)?)
+    }
 
-    //         },
-    //         Command::RequestWork => {},
-    //         Command::Deliver => {},
-    //     }
-    //     todo!();
-
-    // }
-
-    /// Formats either the success or error message.
-    fn format_response(res: String) -> Response {
-        todo!();
+    async fn run_command(&self, cmd: Command, text: String) -> Result<String> {
+        match cmd {
+            Command::AddFilms => {
+                let manager = FilmManager::new(self.db.clone());
+                let msg: String = text.split_whitespace().skip(2).collect();
+                manager.insert_films(&msg).await
+            }
+            Command::RequestWork => Err(Error::InvalidArg("unimplemented".into())),
+            Command::Deliver => Err(Error::InvalidArg("unimplemented".into())),
+        }
     }
 }
 
@@ -92,14 +91,22 @@ impl Response {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::store::mock::MockClient;
 
-//     #[test]
-//     fn get_command() {
-//         let s = "<@U0LAN0Z89> addfilms star wars, star trek".to_string();
-//         let command = parse_command(s);
-//         assert!(command.is_ok());
-//     }
-// }
+    fn setup() -> AppMention<MockClient> {
+        AppMention {
+            db: Database::<MockClient>::new(),
+        }
+    }
+
+    #[test]
+    fn get_command() {
+        let m = setup();
+        let s = "<@U0LAN0Z89> addfilms star wars, star trek";
+        let command = m.parse_command(s);
+        assert!(command.is_ok());
+    }
+}

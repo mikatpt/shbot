@@ -3,34 +3,27 @@ use std::str::FromStr;
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use deadpool_postgres::Pool;
 use tokio_postgres::Row;
 use tracing::info;
 use uuid::Uuid;
 
 use crate::{
     models::{Film, Priority, Role, Roles},
-    store::{Client, Database, PostgresClient},
+    store::Client,
     Error, Result,
 };
 
-/// Server-facing API implementation for films.
-// impl Database<PostgresClient> {
-//     pub async fn list_films(&self) -> Result<Vec<Film>> {
-//         self.client.list_films().await
-//     }
+/// Internal Postgres client.
+pub(crate) struct PostgresClient {
+    pool: Pool,
+}
 
-//     pub async fn get_film(&self, film_name: &str) -> Result<Option<Film>> {
-//         self.client.get_film(film_name).await
-//     }
-
-//     pub async fn insert_film(&self, name: &str, priority: Priority) -> Result<Film> {
-//         self.client.insert_film(name, priority).await
-//     }
-
-//     pub async fn update_film(&self, film: &Film) -> Result<()> {
-//         self.client.update_film(film).await
-//     }
-// }
+impl PostgresClient {
+    pub(crate) fn new(pool: Pool) -> Self {
+        Self { pool }
+    }
+}
 
 #[async_trait]
 impl Client for PostgresClient {
@@ -122,6 +115,12 @@ impl Client for PostgresClient {
         info!("Updated film: {}", film.name);
 
         Ok(())
+    }
+
+    fn clone(&self) -> Self {
+        Self {
+            pool: self.pool.clone(),
+        }
     }
 }
 

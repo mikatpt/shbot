@@ -1,42 +1,41 @@
 use std::str::FromStr;
 
-use crate::{
-    models::{Film, Priority},
-    server::State,
-    store::Client,
-    Error, Result,
-};
+use crate::{models::Priority, store::Client, store::Database, Error, Result};
 
 use futures::{future, stream::FuturesUnordered};
 use tracing::{error, info};
 
-pub(crate) struct FilmManager<T: Client + Send> {
-    state: State<T>,
+pub(crate) struct FilmManager<T: Client> {
+    db: Database<T>,
 }
 
-impl<T: Client + Send + Sync + 'static> FilmManager<T> {
-    pub(crate) fn new(state: State<T>) -> Self {
-        Self { state }
+impl<T: Client> FilmManager<T> {
+    pub(crate) fn new(db: Database<T>) -> Self {
+        Self { db }
     }
 
     /// Message format: "PRIORITY film1 film2 film3"
-    pub async fn insert_films(&self, message: &str) -> Result<Vec<Result<Film>>> {
+    /// Returns slack text detailing # of inserts.
+    pub async fn insert_films(&self, message: &str) -> Result<String> {
+        use std::collections::HashSet;
         let (priority, film_names) = message.trim().split_once(' ').unwrap_or_default();
 
         info!("Inserting {priority} priority films: {film_names:?}");
 
         let priority = Priority::from_str(priority)?;
+        let film_names: Vec<_> = film_names
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .collect();
 
         // Concurrently insert all films
         let films: FuturesUnordered<_> = film_names
-            .split(',')
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
+            .clone()
+            .into_iter()
             .map(|film_name| {
-                let db = self.state.db.clone();
+                let db = self.db.clone();
                 tokio::spawn(async move {
-                    let a = db.lock().await;
-                    a.insert_film(&film_name, priority)
+                    db.insert_film(&film_name, priority)
                         .await
                         .map_err(|e| -> Error {
                             error!("{e}");
@@ -52,6 +51,48 @@ impl<T: Client + Send + Sync + 'static> FilmManager<T> {
             .into_iter()
             .map(|r| r.map_err(Into::<Error>::into))
             .collect();
-        v
+
+        let v = v?;
+        let successes: HashSet<_> = v
+            .iter()
+            .filter(|r| r.is_ok())
+            .map(|r| {
+                if let Ok(res) = r {
+                    return res.name.as_str();
+                }
+                unreachable!()
+            })
+            .collect();
+
+        let fails = film_names
+            .iter()
+            .filter(|n| !successes.contains(n.as_str()));
+
+        let mut msg = String::new();
+
+        if !successes.is_empty() {
+            msg += &format!("Successfully inserted {} films(s):\n", successes.len());
+            successes.iter().for_each(|&s| {
+                msg += s;
+                msg += ", ";
+            });
+            msg.pop();
+            msg.pop();
+        }
+
+        if film_names.len() - successes.len() > 0 {
+            if !successes.is_empty() {
+                msg += "\n";
+            }
+            msg += "Some films were duplicates, so skipped:\n";
+            fails.for_each(|s| {
+                msg += s;
+                msg += ", ";
+            });
+            msg.pop();
+            msg.pop();
+        }
+
+        Ok(msg)
     }
 }

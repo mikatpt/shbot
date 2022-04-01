@@ -6,7 +6,6 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use futures::lock::Mutex;
 use tracing::info;
 
 use crate::{
@@ -18,27 +17,26 @@ mod handlers;
 mod interceptors;
 
 /// Contains all server-wide stateful data.
-pub(crate) type State<T: Client> = Arc<InnerState<T>>;
+pub(crate) type State<T> = Arc<InnerState<T>>;
 
 /// All server results must return a UserError.
 /// This allows us to report readable errors and hide internal errors.
 pub type Result<T> = std::result::Result<T, UserError>;
 
-pub(crate) struct InnerState<T: Client + Send> {
-    pub(crate) db: Arc<Mutex<Database<T>>>,
+pub(crate) struct InnerState<T: Client> {
+    pub(crate) db: Database<T>,
     pub(crate) oauth_token: String,
     pub(crate) req_client: reqwest::Client,
 }
 
-impl<T: Client + Send> std::fmt::Debug for InnerState<T> {
+impl<T: Client> std::fmt::Debug for InnerState<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("<State>").finish()
     }
 }
 
 fn initialize_state(cfg: &Config) -> color_eyre::Result<State<PostgresClient>> {
-    let db = crate::store::Database::new(&cfg.postgres)?;
-    let db = Arc::new(Mutex::new(db));
+    let db = crate::store::Database::<PostgresClient>::new(&cfg.postgres)?;
     let oauth_token = cfg.token.to_string();
     let req_client = reqwest::Client::builder().build()?;
 
@@ -67,7 +65,7 @@ pub async fn serve(cfg: &Config) -> color_eyre::Result<()> {
 }
 
 /// Initialize axum app and attach all routes.
-fn new_router<T: Client + Send + Sync + 'static>(state: State<T>) -> Router {
+fn new_router<T: Client>(state: State<T>) -> Router {
     let app = Router::new()
         .route("/", get(handlers::home))
         .route(
