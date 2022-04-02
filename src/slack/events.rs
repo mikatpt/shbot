@@ -60,7 +60,6 @@ impl EventRequest {
     /// Since this can be a long-running task, we will log errors here.
     #[tracing::instrument(skip_all)]
     pub(crate) async fn handle_event<T: Client>(self, state: State<T>) {
-        info!("Handling async {} event...", self.event_type.as_ref());
         debug!("[EVENT]: {:?}", self.event);
 
         let result = match self.event {

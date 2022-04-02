@@ -56,9 +56,9 @@ pub struct Student {
 impl Student {
     /// Increments role and returns it.
     pub fn increment_role(&mut self) -> Role {
-        let role = self.roles.increment_role();
-        self.current_role = role;
-        role
+        self.roles.complete_role(self.current_role);
+        self.current_role = self.roles.get_next_role();
+        self.current_role
     }
 
     pub fn get_next_role(&self) -> Role {
@@ -93,9 +93,9 @@ impl Film {
 
     /// Increments role and returns it.
     pub fn increment_role(&mut self) -> Role {
-        let role = self.roles.increment_role();
-        self.current_role = role;
-        role
+        self.roles.complete_role(self.current_role);
+        self.current_role = self.roles.get_next_role();
+        self.current_role
     }
 
     pub fn get_next_role(&self) -> Role {
@@ -140,17 +140,7 @@ impl Roles {
         }
     }
 
-    pub fn increment_role(&mut self) -> Role {
-        let next_role = self.get_next_role();
-        if Role::Done == next_role {
-            return Role::Done;
-        }
-
-        self.add_role(next_role);
-        next_role
-    }
-
-    fn add_role(&mut self, role: Role) {
+    pub fn complete_role(&mut self, role: Role) {
         let now = Some(Utc::now());
         match role {
             Role::Ae => self.ae = now,

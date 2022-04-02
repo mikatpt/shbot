@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use color_eyre::eyre::eyre;
 use deadpool_postgres::Pool;
 use tokio_postgres::Row;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use crate::{
@@ -33,6 +33,7 @@ impl Client for PostgresClient {
     // ------------- Films ------------- //
 
     async fn list_films(&self) -> Result<Vec<Film>> {
+        info!("Retrieving all films");
         let client = self.pool.get().await?;
 
         let stmt = "
@@ -162,6 +163,7 @@ impl Client for PostgresClient {
     // ------------- Students ------------- //
 
     async fn list_students(&self) -> Result<Vec<Student>> {
+        info!("Retrieving list of students");
         let client = self.pool.get().await?;
 
         let stmt = "
@@ -178,6 +180,7 @@ impl Client for PostgresClient {
     }
 
     async fn get_student(&self, slack_id: &str) -> Result<Student> {
+        debug!("Retrieving student with id {slack_id}");
         let client = self.pool.get().await?;
 
         let stmt = "
@@ -195,7 +198,10 @@ impl Client for PostgresClient {
         }
         let row = rows.pop().expect("^^just checked if empty");
 
-        Ok(format_row_into_student(row)?)
+        let student = format_row_into_student(row)?;
+        info!("Retrieved student {}", student.name);
+
+        Ok(student)
     }
 
     async fn insert_student(&self, slack_id: &str) -> Result<Student> {
@@ -244,24 +250,35 @@ impl Client for PostgresClient {
     }
 
     async fn update_student(&self, student: &Student) -> Result<()> {
-        let client = self.pool.get().await?;
+        let mut client = self.pool.get().await?;
 
         let stmt = "
             UPDATE roles
             SET ae = $2, editor = $3, sound = $4, color = $5, current = $6
             WHERE id = (
-                SELECT roles_id FROM students WHERE slack_id = $1);";
+                SELECT roles_id FROM students WHERE id = $1);";
         let stmt = client.prepare_cached(stmt).await?;
 
+        let stmt2 = "UPDATE students SET current_film = $2 WHERE id = $1";
+        let stmt2 = client.prepare_cached(stmt2).await?;
+
+        let transaction = client.transaction().await?;
+
         #[rustfmt::skip]
-        client.query(&stmt, &[
-            &student.slack_id,
+        transaction.query(&stmt, &[
+            &student.id,
             &student.roles.ae,
             &student.roles.editor,
             &student.roles.sound,
             &student.roles.color,
-            &student.current_film,
+            &student.current_role.as_ref(),
         ]).await?;
+
+        transaction
+            .query(&stmt2, &[&student.id, &student.current_film])
+            .await?;
+
+        transaction.commit().await?;
 
         info!("Updated student: {}", student.name);
 
@@ -297,15 +314,10 @@ impl Client for PostgresClient {
             let channel: Option<String> = row.get("channel");
             let created_at: DateTime<Utc> = row.get("created_at");
 
+            #[rustfmt::skip]
             let item = QueueItem {
-                id,
-                student_slack_id,
-                film_name,
-                role,
-                priority,
-                created_at,
-                msg_ts,
-                channel,
+                id, student_slack_id, film_name, role,
+                priority, created_at, msg_ts, channel,
             };
             res.push(item);
         }
@@ -316,7 +328,6 @@ impl Client for PostgresClient {
         Ok(res)
     }
 
-    #[rustfmt::skip]
     async fn insert_to_queue(&self, q: QueueItem, wait: bool) -> Result<QueueItem> {
         let client = self.pool.get().await?;
 
@@ -325,6 +336,7 @@ impl Client for PostgresClient {
              VALUES($1, $2, $3, $4, $5, $6);";
             let stmt = client.prepare_cached(stmt).await?;
 
+            #[rustfmt::skip]
             client.query(&stmt, &[
                 &q.id,
                 &q.student_slack_id,
@@ -339,6 +351,7 @@ impl Client for PostgresClient {
             let stmt = client.prepare_cached(stmt).await?;
             let p = q.priority.map(|a| a.as_ref().to_string());
 
+            #[rustfmt::skip]
             client.query(&stmt, &[
                 &q.id,
                 &q.student_slack_id,
@@ -348,9 +361,11 @@ impl Client for PostgresClient {
             ]).await?;
         }
 
-        let s = if wait { "wait" } else { "jobs" };
-        info!("Inserted {} into the {s} queue", q.student_slack_id);
-
+        if wait {
+            info!("Inserted {} into the wait queue", q.student_slack_id);
+        } else {
+            info!("Inserted {} into the jobs queue", q.film_name);
+        }
 
         Ok(q)
     }

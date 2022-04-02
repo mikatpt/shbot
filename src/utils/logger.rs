@@ -106,7 +106,7 @@ impl Logger {
             // .with(console_layer)
             .with(ErrorLayer::default());
 
-        if environment == "local" {
+        if environment == "local" || environment == "production" {
             let local_fmt = fmt::layer().event_format(local_fmt).with_writer(writer);
             registry.with(local_fmt).init();
         } else {

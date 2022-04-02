@@ -3,10 +3,11 @@ use std::{collections::HashSet, str::FromStr};
 
 use futures::{future, stream::FuturesUnordered};
 use itertools::Itertools;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 use crate::{
-    models::Priority, server::State, slack::app_mentions::Response, store::Client, Error, Result,
+    models::Priority, queue::QueueItem, server::State, slack::app_mentions::Response,
+    store::Client, Error, Result,
 };
 
 pub(crate) struct FilmManager<T: Client> {
@@ -35,11 +36,14 @@ impl<T: Client> FilmManager<T> {
     /// Returns a formatted response to send back to the user
     pub async fn request_work(&self, slack_id: &str, ts: &str, channel: &str) -> String {
         match self.state.queue.try_assign_job(slack_id, ts, channel).await {
-            Ok(Some(j)) => format!(
-                "You've been assigned to work {} on {}!",
-                j.role.as_ref(),
-                j.film_name
-            ),
+            Ok(Some(j)) => {
+                info!("Assigned {} to {}", slack_id, j.film_name);
+                format!(
+                    "You've been assigned to work {} on {}!",
+                    j.role.as_ref(),
+                    j.film_name
+                )
+            }
             Ok(None) => NO_WORK.to_string(),
             Err(err) => {
                 if let Error::Duplicate(_) = err {
@@ -54,43 +58,37 @@ impl<T: Client> FilmManager<T> {
 
     /// Deliver work. On success, attempts to assign out jobs to the wait queue.
     pub async fn deliver_work(&self, slack_id: &str) -> String {
+        debug!("Delivering work for {slack_id}");
         let student = match self.state.db.get_student(slack_id).await {
             Ok(u) => u,
             Err(e) => return report_error(e),
         };
+        let name = student.name.clone();
         match self.state.queue.deliver(student, slack_id).await {
-            Ok(_) => {
-                // After delivering the work, we'll try to assign jobs out to the wait queue.
-                let s = self.state.clone();
-                tokio::spawn(async move {
-                    match s.queue.try_empty_wait_queue().await {
-                        Ok(jobs) => {
-                            for job in jobs {
-                                let channel = job.channel.unwrap();
-                                let msg = "msg".to_string();
-                                let ts = job.msg_ts;
-                                let res = Response::new(channel, msg, ts);
-                                let send = s
-                                    .req_client
-                                    .post("https://slack.com/api/chat.postMessage")
-                                    .bearer_auth(&s.oauth_token)
-                                    .json(&res)
-                                    .send()
-                                    .await;
-                                match send {
-                                    Ok(_) => {}
-                                    Err(e) => error!("{e}"),
-                                }
-                            }
-                        }
-                        Err(e) => error!("bad things happened: {e}"),
-                    }
-                });
-            }
+            Ok(_) => self.empty_wait_queue().await,
             Err(e) => return report_error(e),
         }
 
+        info!("Successful delivery for {}!", name);
+
         DELIVER.to_string()
+    }
+
+    /// After delivering the work, we'll try to assign jobs out to the wait queue.
+    /// This is done in the background via a tokio task.
+    async fn empty_wait_queue(&self) {
+        let s = self.state.clone();
+        tokio::spawn(async move {
+            let (client, token) = (&s.req_client, &s.oauth_token);
+            match s.queue.try_empty_wait_queue().await {
+                Ok(jobs) => {
+                    for job in jobs {
+                        notify_waiter(client, token, job).await;
+                    }
+                }
+                Err(e) => error!("bad things happened: {e}"),
+            }
+        });
     }
 
     /// Insert empty film to the database and to the jobs_q
@@ -177,6 +175,28 @@ impl<T: Client> FilmManager<T> {
         }
 
         msg
+    }
+}
+
+async fn notify_waiter(client: &reqwest::Client, token: &str, job: QueueItem) {
+    info!("Notifying waiter: assigned out {}", job.film_name);
+
+    // must exist on job
+    let msg = format!(
+        "You've been assigned to work {} on {}!",
+        job.role.as_ref(),
+        job.film_name
+    );
+    let res = Response::new(job.channel.unwrap(), msg, job.msg_ts);
+    let send = client
+        .post("https://slack.com/api/chat.postMessage")
+        .bearer_auth(token)
+        .json(&res)
+        .send()
+        .await;
+
+    if let Err(e) = send {
+        error!("{e}");
     }
 }
 

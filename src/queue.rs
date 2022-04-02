@@ -4,6 +4,7 @@ use std::{cmp::Ordering, sync::Arc};
 use chrono::{DateTime, Utc};
 use color_eyre::eyre::eyre;
 use futures::lock::Mutex;
+use tracing::info;
 use uuid::Uuid;
 
 use crate::models::Student;
@@ -19,6 +20,45 @@ pub(crate) struct Queue<T: Client> {
     pub jobs_q: Q,
     pub wait_q: Q,
     db: Database<T>,
+}
+
+type Q = Arc<Mutex<BinaryHeap<QueueItem>>>;
+
+// TODO: we didn't strongly type queue item variants and now it's annoying. maybe fix this?
+/// Non-generic queue, works for films and students both.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct QueueItem {
+    pub id: Uuid,
+    pub student_slack_id: String,
+    pub film_name: String,
+    pub role: Role,
+    pub priority: Option<Priority>,
+    pub msg_ts: Option<String>,
+    pub channel: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+
+impl PartialOrd for QueueItem {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for QueueItem {
+    fn cmp(&self, other: &Self) -> Ordering {
+        if let (Some(prio), Some(prio_other)) = (self.priority, other.priority) {
+            match prio.cmp(&prio_other) {
+                Ordering::Equal => {} // If priority is equal, check timestamp.
+                ord => return ord,
+            }
+        }
+
+        match other.created_at.cmp(&self.created_at) {
+            Ordering::Equal => {}
+            ord => return ord,
+        }
+        other.film_name.cmp(&self.film_name)
+    }
 }
 
 impl Queue<MockClient> {
@@ -98,20 +138,26 @@ impl<T: Client> Queue<T> {
             let e = "You're done! No more work to do :)";
             return Err(Error::Duplicate(e.into()));
         }
+
+        info!("Trying to assign job: now retrieving all films student has worked!");
         let student_films = self.db.get_student_films(&student.id).await?;
         let worked_films: HashSet<_> = student_films.iter().map(|f| f.name.clone()).collect();
 
         // NOTE:  don't increment until they deliver!
         let role = student.current_role;
 
+        info!("Searching for eligible jobs...");
         let job_to_do = self.get_job(worked_films, slack_id, role).await;
 
         // If there was no suitable job found, insert student into the wait queue
         if job_to_do.is_none() {
+            info!("No job found - inserting {} to the wait_q", &student.name);
             self.insert_waiter(role, ts, channel, &student.slack_id)
                 .await?;
             return Ok(None);
         }
+
+        info!("Updating student and film records and removing job from queue");
 
         // ...otherwise, remove job from db and add a students_films record.
         // Also, update the student and film records to reflect the current state.
@@ -126,6 +172,7 @@ impl<T: Client> Queue<T> {
             None => return Err(Error::Internal(eyre!("Impossible state"))),
         }
 
+        info!("Assigned {} to {}", student.name, job.film_name);
         Ok(Some(job))
     }
 
@@ -200,44 +247,6 @@ impl<T: Client> Queue<T> {
         };
         wait_q.push(waiter.clone());
         self.db.insert_to_queue(waiter, true).await
-    }
-}
-
-type Q = Arc<Mutex<BinaryHeap<QueueItem>>>;
-
-/// Non-generic queue, works for films and students both.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct QueueItem {
-    pub id: Uuid,
-    pub student_slack_id: String,
-    pub film_name: String,
-    pub role: Role,
-    pub priority: Option<Priority>,
-    pub msg_ts: Option<String>,
-    pub channel: Option<String>,
-    pub created_at: DateTime<Utc>,
-}
-
-impl PartialOrd for QueueItem {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for QueueItem {
-    fn cmp(&self, other: &Self) -> Ordering {
-        if let (Some(prio), Some(prio_other)) = (self.priority, other.priority) {
-            match prio.cmp(&prio_other) {
-                Ordering::Equal => {} // If priority is equal, check timestamp.
-                ord => return ord,
-            }
-        }
-
-        match other.created_at.cmp(&self.created_at) {
-            Ordering::Equal => {}
-            ord => return ord,
-        }
-        other.film_name.cmp(&self.film_name)
     }
 }
 
