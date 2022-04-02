@@ -260,7 +260,7 @@ impl Client for PostgresClient {
             &student.roles.editor,
             &student.roles.sound,
             &student.roles.color,
-            &student.current_role.as_ref(),
+            &student.current_film,
         ]).await?;
 
         info!("Updated student: {}", student.name);

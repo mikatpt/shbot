@@ -46,19 +46,16 @@ impl<T: Client> AppMention<T> {
         let (ts, channel) = (ts.clone(), channel.clone());
 
         if text.split_whitespace().nth(1).is_none() {
-            return Ok(Response::new(channel, HELLO.to_string(), Some(ts)));
+            return Ok(Response::new(channel, HELLO.to_string(), None));
         }
-
-        #[rustfmt::skip]
-        let ts = if ts == "0" { Some(ts) } else { None };
 
         let cmd = match self.parse_command() {
             Ok(c) => c,
-            Err(_) => return Ok(Response::new(channel, CMD_ERR.to_string(), ts)),
+            Err(_) => return Ok(Response::new(channel, CMD_ERR.to_string(), Some(ts))),
         };
 
         let msg = self.run_command(cmd).await;
-        Ok(Response::new(channel, msg, ts))
+        Ok(Response::new(channel, msg, Some(ts)))
     }
 
     /// Parse the event text for a command.
