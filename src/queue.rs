@@ -104,6 +104,8 @@ impl<T: Client> Queue<T> {
     }
 
     /// Returns Vec of jobs.
+    /// We must manually attach student slack id to the successes so we can
+    /// notify them in the async case.
     pub(crate) async fn try_empty_wait_queue(&self) -> Result<Vec<QueueItem>> {
         let mut wait_q = self.wait_q.lock().await;
         let mut successes = vec![];
@@ -115,7 +117,10 @@ impl<T: Client> Queue<T> {
             let channel = &waiter.channel.clone().unwrap_or_default();
             match self.try_assign_job(id, ts, channel).await {
                 Ok(None) => recycle.push(waiter),
-                Ok(Some(job)) => successes.push(job),
+                Ok(Some(mut job)) => {
+                    job.student_slack_id = id.to_string();
+                    successes.push(job)
+                }
                 Err(e) => return Err(e),
             };
         }

@@ -58,10 +58,7 @@ impl EventRequest {
     ///
     /// Normally, we log errors right before reporting them to the user.
     /// Since this can be a long-running task, we will log errors here.
-    #[tracing::instrument(skip_all)]
     pub(crate) async fn handle_event<T: Client>(self, state: State<T>) {
-        debug!("[EVENT]: {:?}", self.event);
-
         let result = match self.event {
             Event::AppMention { .. } => self.handle_app_mention(state).await,
             // _ => Ok(()),
@@ -74,8 +71,6 @@ impl EventRequest {
 
     /// Entry gateway for mentions: branch out based on the parsed operation request.
     async fn handle_app_mention<T: Client>(self, state: State<T>) -> Result<()> {
-        info!("Handling app mention");
-
         let manager = super::app_mentions::AppMention::new(state.clone(), self.event);
 
         let res = manager.handle_event().await?;

@@ -15,7 +15,8 @@ pub(crate) struct FilmManager<T: Client> {
 }
 
 const DELIVER: &str = "Good job!! You've delivered your work.
-When you're ready to pick up another job, just type @ShereeBot request-work.
+
+When you're ready to pick up another job, just type `@ShereeBot request-work`.
 Then, I'll message you back when there's a job ready for you.";
 
 const INTERNAL_ERR: &str = "Something went wrong internally - please let Sheree know!";
@@ -34,12 +35,13 @@ impl<T: Client> FilmManager<T> {
 
     /// When a request comes in, polls the jobs queue for work to assign.
     /// Returns a formatted response to send back to the user
+    #[tracing::instrument(skip(self, ts, channel))]
     pub async fn request_work(&self, slack_id: &str, ts: &str, channel: &str) -> String {
         match self.state.queue.try_assign_job(slack_id, ts, channel).await {
             Ok(Some(j)) => {
-                info!("Assigned {} to {}", slack_id, j.film_name);
                 format!(
-                    "You've been assigned to work {} on {}!",
+                    "<@{}> You've been assigned to work `{}` on `{}`!",
+                    slack_id,
                     j.role.as_ref(),
                     j.film_name
                 )
@@ -57,6 +59,7 @@ impl<T: Client> FilmManager<T> {
     }
 
     /// Deliver work. On success, attempts to assign out jobs to the wait queue.
+    #[tracing::instrument(skip(self))]
     pub async fn deliver_work(&self, slack_id: &str) -> String {
         debug!("Delivering work for {slack_id}");
         let student = match self.state.db.get_student(slack_id).await {
@@ -92,10 +95,11 @@ impl<T: Client> FilmManager<T> {
     }
 
     /// Insert empty film to the database and to the jobs_q
+    #[tracing::instrument(skip(self))]
     pub async fn insert_films(&self, message: &str) -> String {
         let (priority, film_names) = message.trim().split_once(' ').unwrap_or_default();
 
-        info!("Inserting {priority} priority films: {film_names:?}");
+        info!("Inserting {priority} priority films");
 
         let priority = match Priority::from_str(priority) {
             Ok(p) => p,
@@ -178,12 +182,13 @@ impl<T: Client> FilmManager<T> {
     }
 }
 
+/// NOTE: You must manually attach a student slack id to the job when calling this!
 async fn notify_waiter(client: &reqwest::Client, token: &str, job: QueueItem) {
     info!("Notifying waiter: assigned out {}", job.film_name);
 
-    // must exist on job
     let msg = format!(
-        "You've been assigned to work {} on {}!",
+        "<@{}> You've been assigned to work `{}` on `{}`!",
+        job.student_slack_id,
         job.role.as_ref(),
         job.film_name
     );

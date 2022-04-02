@@ -35,13 +35,10 @@ pub(super) async fn home() -> Html<&'static str> {
 
 // --------------- Events API --------------- //
 
-#[tracing::instrument(skip_all)]
 pub(super) async fn events_api_entrypoint<T: Client>(
     Json(request): Json<Value>,
     Extension(state): Extension<State<T>>,
 ) -> Result<(StatusCode, String)> {
-    debug!("handling event: {}", request);
-
     if let Some(challenge) = request.get("challenge") {
         info!("Auth challenge received");
         return Ok((StatusCode::OK, challenge.to_string()));

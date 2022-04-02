@@ -3,6 +3,7 @@ use std::str::FromStr;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use strum::EnumString;
+use tracing::debug;
 
 use crate::{
     films::FilmManager, server::State, slack::events::Event, store::Client, Error, Result,
@@ -40,7 +41,10 @@ impl<T: Client> AppMention<T> {
     /// 1. Parses desired command from the message.
     /// 2. Runs the requested command.
     /// 3. Returns a formatted `Response` with either an error or success msg
+    #[tracing::instrument(name = "app_mention", skip_all)]
     pub(crate) async fn handle_event(&self) -> Result<Response> {
+        debug!("[handle_event]: {:?}", self.event);
+
         #[rustfmt::skip]
         let Event::AppMention { ts, channel, text, .. } = &self.event;
         let (ts, channel) = (ts.clone(), channel.clone());
