@@ -3,6 +3,7 @@ use std::{collections::HashSet, str::FromStr};
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use color_eyre::eyre::eyre;
 use deadpool_postgres::Pool;
 use tokio_postgres::Row;
 use tracing::{info, warn};
@@ -17,7 +18,7 @@ use crate::{
 };
 
 /// Internal Postgres client.
-pub(crate) struct PostgresClient {
+pub struct PostgresClient {
     pool: Pool,
 }
 
@@ -62,7 +63,10 @@ impl Client for PostgresClient {
         }
         let row = rows.pop().expect("^^just checked if empty");
 
-        Ok(Some(format_row_into_film(row)?))
+        let film = Some(format_row_into_film(row)?);
+        info!("Retrieved film {name}");
+
+        Ok(film)
     }
 
     async fn insert_film(&self, name: &str, priority: Priority) -> Result<Film> {
@@ -129,7 +133,7 @@ impl Client for PostgresClient {
         let stmt = "
             SELECT f.id, f.name, f.priority, r.ae, r.editor, r.sound, r.color, r.current
             FROM films as f 
-                JOIN roles AS r ON f.roles_id = roles.id 
+                JOIN roles AS r ON f.roles_id = r.id 
                 JOIN students_films on f.id = students_films.film_id
             WHERE students_films.student_id = $1;";
         let stmt = client.prepare_cached(stmt).await?;
@@ -137,8 +141,10 @@ impl Client for PostgresClient {
         let rows = client.query(&stmt, &[&student_id]).await?;
 
         let res: Result<HashSet<_>> = rows.into_iter().map(format_row_into_film).collect();
+        let res = res?;
+        info!("Retrieved {} rows from students_films", res.len());
 
-        Ok(res?)
+        Ok(res)
     }
 
     async fn insert_student_films(&self, student_id: &Uuid, film_id: &Uuid) -> Result<()> {
@@ -148,6 +154,7 @@ impl Client for PostgresClient {
         let stmt = client.prepare_cached(stmt).await?;
 
         client.query(&stmt, &[&student_id, &film_id]).await?;
+        info!("Inserted into students_films");
 
         Ok(())
     }
@@ -302,6 +309,10 @@ impl Client for PostgresClient {
             };
             res.push(item);
         }
+
+        let s = if wait { "wait" } else { "jobs" };
+        info!("Retrieved {s} queue");
+
         Ok(res)
     }
 
@@ -310,20 +321,7 @@ impl Client for PostgresClient {
         let client = self.pool.get().await?;
 
         if wait {
-            let stmt = "INSERT INTO wait_q(id, student_slack_id, film_name, role, priority)
-             VALUES($1, $2, $3, $4, $5);";
-            let stmt = client.prepare_cached(stmt).await?;
-            let p = q.priority.map(|a| a.as_ref().to_string());
-
-            client.query(&stmt, &[
-                &q.id,
-                &q.student_slack_id,
-                &q.film_name,
-                &q.role.as_ref(),
-                &p,
-            ]).await?;
-        } else {
-            let stmt = "INSERT INTO jobs_q(id, student_slack_id, film_name, role, msg_ts, channel)
+            let stmt = "INSERT INTO wait_q(id, student_slack_id, film_name, role, msg_ts, channel)
              VALUES($1, $2, $3, $4, $5, $6);";
             let stmt = client.prepare_cached(stmt).await?;
 
@@ -335,7 +333,24 @@ impl Client for PostgresClient {
                 &q.msg_ts,
                 &q.channel,
             ]).await?;
+        } else {
+            let stmt = "INSERT INTO jobs_q(id, student_slack_id, film_name, role, priority)
+             VALUES($1, $2, $3, $4, $5);";
+            let stmt = client.prepare_cached(stmt).await?;
+            let p = q.priority.map(|a| a.as_ref().to_string());
+
+            client.query(&stmt, &[
+                &q.id,
+                &q.student_slack_id,
+                &q.film_name,
+                &q.role.as_ref(),
+                &p,
+            ]).await?;
         }
+
+        let s = if wait { "wait" } else { "jobs" };
+        info!("Inserted {} into the {s} queue", q.student_slack_id);
+
 
         Ok(q)
     }
@@ -359,6 +374,22 @@ impl Client for PostgresClient {
         Self {
             pool: self.pool.clone(),
         }
+    }
+
+    async fn drop_db(&self) -> Result<()> {
+        let environment = std::env::var("ENVIRONMENT")?;
+        if environment != "test" {
+            return Err(Error::Internal(eyre!("Cannot drop db outside of testing")));
+        }
+
+        let db = std::env::var("TEST_POSTGRES_DBNAME")?;
+        let client = self.pool.get().await?;
+        let stmt = client
+            .prepare_cached(&format!("DROP DATABASE {};", db))
+            .await?;
+        client.query(&stmt, &[]).await?;
+
+        Ok(())
     }
 }
 

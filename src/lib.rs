@@ -1,9 +1,9 @@
+pub mod models;
+pub mod queue;
 pub mod server;
 pub mod store;
 
 mod films;
-mod models;
-mod queue;
 mod slack;
 mod utils;
 

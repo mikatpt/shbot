@@ -127,7 +127,8 @@ mod tests {
     #[test]
     fn test_log() -> Result<()> {
         env::set_var("RUST_LOG", "trace");
-        let path = Path::new("/tmp/protols/test/log_test.log");
+        env::set_var("ENVIRONMENT", "production");
+        let path = Path::new("/tmp/shbot/test/log_test.log");
         install(Some(path));
 
         info!("info");

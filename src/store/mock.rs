@@ -20,6 +20,12 @@ pub struct MockClient {
 
 impl Database<MockClient> {
     pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl Default for Database<MockClient> {
+    fn default() -> Self {
         Self {
             client: MockClient { success: true },
         }
@@ -107,5 +113,9 @@ impl Client for MockClient {
         Self {
             success: self.success,
         }
+    }
+
+    async fn drop_db(&self) -> Result<()> {
+        Err(Error::Internal(eyre!("sample error")))
     }
 }

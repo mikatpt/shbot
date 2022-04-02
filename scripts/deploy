@@ -30,7 +30,7 @@ DB_IP=$(terraform show -json | jq '.values.outputs.db_ip.value' | sed 's/"//g')
 
 cd ../
 
-_info "sourcing variables"
+_info "Sourcing variables"
 source .env
 
 sed -i "s/POSTGRES_HOST.*/POSTGRES_HOST=${DB_IP}/" ./.env.prod
@@ -42,8 +42,7 @@ _info "Cleaning up old images"
 docker image prune -f
 
 _info "Authenticating with docker"
-aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin
-${TF_VAR_ecr_url}
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${TF_VAR_ecr_url}
 
 _info "Pushing image to docker"
 docker tag shbot_api ${TF_VAR_ecr_image}

@@ -12,8 +12,8 @@ use crate::{
     Result,
 };
 
-pub(crate) mod postgres;
-pub(crate) use postgres::PostgresClient;
+pub mod postgres;
+pub use postgres::PostgresClient;
 pub mod mock;
 
 /// Server-facing API boundary.
@@ -23,13 +23,13 @@ pub mod mock;
 // This is not statically checked; that would require us writing and implementing an external
 // trait, which just isn't done in Rust; you'd have to import the trait on every usage.
 #[derive(Debug)]
-pub(crate) struct Database<T: Client> {
+pub struct Database<T: Client> {
     client: T,
 }
 
 #[async_trait]
 /// Internal interface. All clients must implement this.
-pub(crate) trait Client: Send + Sync + 'static {
+pub trait Client: Send + Sync + 'static {
     async fn list_films(&self) -> Result<Vec<Film>>;
     async fn get_film(&self, film_name: &str) -> Result<Option<Film>>;
     async fn insert_film(&self, name: &str, priority: Priority) -> Result<Film>;
@@ -47,6 +47,9 @@ pub(crate) trait Client: Send + Sync + 'static {
     async fn insert_to_queue(&self, q: QueueItem, wait: bool) -> Result<QueueItem>;
     async fn delete_from_queue(&self, id: &Uuid, wait: bool) -> Result<()>;
 
+    async fn drop_db(&self) -> Result<()>;
+
+    #[must_use]
     fn clone(&self) -> Self;
 }
 
@@ -127,8 +130,14 @@ impl<T: Client> Database<T> {
         self.client.get_queue(wait).await
     }
 
+    /// Deletes an item from the given queue.
     pub async fn delete_from_queue(&self, id: &Uuid, wait: bool) -> Result<()> {
         self.client.delete_from_queue(id, wait).await
+    }
+
+    /// Drops database. Only works in test env.
+    pub async fn drop_db(&self) -> Result<()> {
+        self.client.drop_db().await
     }
 }
 
