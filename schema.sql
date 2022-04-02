@@ -11,6 +11,7 @@ DO $schema$ BEGIN
     CREATE TABLE IF NOT EXISTS roles (
         id              UUID PRIMARY KEY,
         current         TEXT NOT NULL DEFAULT 'Ae',
+        -- These mark completion times.
         ae              TIMESTAMPTZ,
         editor          TIMESTAMPTZ,
         sound           TIMESTAMPTZ,
@@ -29,6 +30,7 @@ DO $schema$ BEGIN
 
     CREATE TABLE IF NOT EXISTS students (
         id              UUID PRIMARY KEY,
+        name            TEXT NOT NULL DEFAULT '',
         roles_id        UUID REFERENCES roles,
         slack_id        TEXT NOT NULL UNIQUE,
         current_film    TEXT,
@@ -41,7 +43,9 @@ DO $schema$ BEGIN
         student_slack_id    TEXT NOT NULL,
         film_name           TEXT NOT NULL,
         role                TEXT NOT NULL,
-        priority            TEXT NOT NULL DEFAULT 'High',
+        priority            TEXT DEFAULT 'High',
+        msg_ts              TEXT, -- not relevant
+        channel             TEXT, -- not relevant
         created_at          TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -50,6 +54,9 @@ DO $schema$ BEGIN
         student_slack_id    TEXT NOT NULL,
         film_name           TEXT NOT NULL,
         role                TEXT NOT NULL,
+        priority            TEXT, -- not relevant
+        msg_ts              TEXT,
+        channel             TEXT,
         created_at          TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 

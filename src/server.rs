@@ -11,7 +11,7 @@ use tracing::info;
 use crate::{
     config::Config,
     queue::Queue,
-    store::{Client, Database, PostgresClient},
+    store::{mock::MockClient, Client, Database, PostgresClient},
     UserError,
 };
 mod handlers;
@@ -28,7 +28,18 @@ pub(crate) struct InnerState<T: Client> {
     pub(crate) db: Database<T>,
     pub(crate) oauth_token: String,
     pub(crate) req_client: reqwest::Client,
-    pub(crate) queue: Queue,
+    pub(crate) queue: Queue<T>,
+}
+
+impl InnerState<MockClient> {
+    pub(crate) fn _new() -> State<MockClient> {
+        Arc::new(Self {
+            db: Database::<MockClient>::new(),
+            oauth_token: "".to_string(),
+            queue: Queue::_new(),
+            req_client: reqwest::Client::new(),
+        })
+    }
 }
 
 impl<T: Client> std::fmt::Debug for InnerState<T> {

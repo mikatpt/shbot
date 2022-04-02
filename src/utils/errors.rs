@@ -14,8 +14,8 @@ pub enum Error {
     NotFound(String),
 
     // Application errors (unexpected)
-    #[error("Unknown error")]
-    Unknown,
+    #[error("Unknown error: {0}")]
+    Unknown(String),
     #[error(transparent)]
     Internal(#[from] eyre::Error),
     #[error(transparent)]
@@ -34,6 +34,8 @@ pub enum Error {
     JsonError(#[from] serde_json::error::Error),
     #[error(transparent)]
     ReqwestError(#[from] reqwest::Error),
+    #[error(transparent)]
+    EnvVarError(#[from] std::env::VarError),
 }
 
 /// All error types reported to the end user.

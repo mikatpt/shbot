@@ -77,9 +77,9 @@ impl EventRequest {
     async fn handle_app_mention<T: Client>(self, state: State<T>) -> Result<()> {
         info!("Handling app mention");
 
-        let manager = super::app_mentions::AppMention::new(state.db.clone());
+        let manager = super::app_mentions::AppMention::new(state.clone(), self.event);
 
-        let res = manager.handle_event(self.event).await?;
+        let res = manager.handle_event().await?;
 
         state
             .req_client

@@ -81,7 +81,7 @@ pub(super) async fn insert_films<T: Client>(
 ) -> Result<Json<SlashResponse>> {
     let slash_command = form.0;
 
-    let manager = FilmManager::new(state.db.clone());
+    let manager = FilmManager::new(state);
     let msg = manager.insert_films(&slash_command.text).await;
     let res = SlashResponse::new(msg, Some(ResponseType::Ephemeral));
 

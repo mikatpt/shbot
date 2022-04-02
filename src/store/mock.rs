@@ -1,10 +1,13 @@
 #![allow(dead_code, unused)]
 
+use std::collections::HashSet;
+
 use async_trait::async_trait;
 use color_eyre::eyre::eyre;
+use uuid::Uuid;
 
 use crate::{
-    models::{Film, Priority},
+    models::{Film, Priority, Student},
     queue::QueueItem,
     store::{Client, Database},
     Error, Result,
@@ -25,6 +28,8 @@ impl Database<MockClient> {
 
 #[async_trait]
 impl Client for MockClient {
+    // ------------- Films ------------- //
+
     async fn list_films(&self) -> Result<Vec<Film>> {
         if self.success {
             return Ok(vec![Film::default()]);
@@ -53,10 +58,48 @@ impl Client for MockClient {
         Err(Error::Internal(eyre!("sample error")))
     }
 
+    // ------------- Junction ------------- //
+
+    async fn get_student_films(&self, student_id: &Uuid) -> Result<HashSet<Film>> {
+        Err(Error::Internal(eyre!("sample error")))
+    }
+
+    async fn insert_student_films(&self, s_id: &Uuid, f_id: &Uuid) -> Result<()> {
+        Err(Error::Internal(eyre!("sample error")))
+    }
+
+    // ------------- Students ------------- //
+
+    async fn list_students(&self) -> Result<Vec<Student>> {
+        Err(Error::Internal(eyre!("sample error")))
+    }
+
+    async fn get_student(&self, slack_id: &str) -> Result<Student> {
+        Err(Error::Internal(eyre!("sample error")))
+    }
+
+    async fn insert_student(&self, slack_id: &str) -> Result<Student> {
+        Err(Error::Internal(eyre!("sample error")))
+    }
+
+    async fn update_student(&self, student: &Student) -> Result<()> {
+        Err(Error::Internal(eyre!("sample error")))
+    }
+
+    // ------------- Queue ------------- //
+
     async fn get_queue(&self, wait: bool) -> Result<Vec<QueueItem>> {
         // if self.success {
         //     return Ok(vec![QueueItem])
         // }
+        Err(Error::Internal(eyre!("sample error")))
+    }
+
+    async fn insert_to_queue(&self, q: QueueItem, wait: bool) -> Result<QueueItem> {
+        Err(Error::Internal(eyre!("sample error")))
+    }
+
+    async fn delete_from_queue(&self, id: &Uuid, wait: bool) -> Result<()> {
         Err(Error::Internal(eyre!("sample error")))
     }
 
