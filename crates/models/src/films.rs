@@ -12,6 +12,7 @@ pub struct Film {
     pub current_role: Role,
     pub priority: Priority,
     pub roles: Roles,
+    pub group_number: i32,
 }
 
 impl Film {
@@ -22,13 +23,15 @@ impl Film {
         current_role: Role,
         priority: Priority,
         roles: Roles,
+        group_number: i32,
     ) -> Self {
-        Film { id, name, current_role, priority, roles }
+        Film { id, name, current_role, priority, roles, group_number }
     }
 
     /// Increments role and returns it.
     pub fn increment_role(&mut self) -> Role {
-        self.roles.complete_role(self.current_role);
+        self.roles
+            .complete_role(self.current_role, self.name.clone());
         self.current_role = self.roles.get_next_role();
         self.current_role
     }
@@ -46,6 +49,7 @@ impl Default for Film {
             priority: Priority::High,
             current_role: Role::Ae,
             roles: Roles::default(),
+            group_number: 0,
         }
     }
 }

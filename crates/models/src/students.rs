@@ -11,12 +11,15 @@ pub struct Student {
     pub current_film: Option<String>,
     pub current_role: Role,
     pub roles: Roles,
+    pub group_number: i32,
+    pub class: String,
 }
 
 impl Student {
     /// Increments role and returns it.
     pub fn increment_role(&mut self) -> Role {
-        self.roles.complete_role(self.current_role);
+        self.roles
+            .complete_role(self.current_role, self.name.clone());
         self.current_role = self.roles.get_next_role();
         self.current_role
     }
@@ -33,8 +36,10 @@ impl Default for Student {
             slack_id: "".to_string(),
             name: "".to_string(),
             current_film: None,
-            current_role: Role::Ae,
+            current_role: Role::default(),
             roles: Roles::default(),
+            group_number: 0,
+            class: "".to_string(),
         }
     }
 }

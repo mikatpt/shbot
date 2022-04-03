@@ -1,10 +1,10 @@
 use chrono::Utc;
 use color_eyre::Result;
 use deadpool_postgres::Runtime::Tokio1;
+use models::{Priority, Role};
 use serial_test::serial;
 use shbot::{
     logger,
-    models::{Priority, Role},
     queue::QueueItem,
     store::{Database, PostgresClient},
 };
@@ -44,7 +44,7 @@ async fn setup() -> Result<Database<PostgresClient>> {
 
     let client = pool.get().await?;
 
-    let statement = include_str!("./test-schema.sql");
+    let statement = include_str!("../../../schema.sql");
     client.batch_execute(statement).await?;
 
     let db = Database::<PostgresClient>::new(&pg_conf())?;
@@ -55,25 +55,19 @@ async fn setup() -> Result<Database<PostgresClient>> {
 #[test]
 #[serial]
 async fn films() -> Result<()> {
-    let a = Role::Ae;
-    let b = a.as_ref();
-    dbg!(b);
     let db = setup().await?;
 
-    db.insert_film("b", Priority::High).await?;
-    let mut film = db.insert_film("a", Priority::High).await?;
+    db.insert_film("b", 0, Priority::High).await?;
+    let mut film = db.insert_film("a", 0, Priority::High).await?;
     assert_eq!("a", film.name);
-    let date_str = "Tue, 1 Jul 2003 10:52:37 +0200";
-    let date = chrono::DateTime::parse_from_rfc2822(date_str).unwrap();
-    let date = date.with_timezone(&Utc);
 
-    film.roles.ae = Some(date);
+    film.roles.ae = Some("mikatpt".to_string());
 
     db.update_film(&film).await?;
 
     let film = db.get_film("a").await?.unwrap();
 
-    assert_eq!(Some(date), film.roles.ae);
+    assert_eq!(Some("mikatpt".to_string()), film.roles.ae);
 
     let films = db.list_films().await?;
     assert_eq!(2, films.len());
@@ -93,23 +87,19 @@ async fn students() -> Result<()> {
         Err(_) => panic!("couldn't hit slack api for some reason"),
     };
 
-    let date_str = "Tue, 1 Jul 2003 10:52:37 +0200";
-    let date = chrono::DateTime::parse_from_rfc2822(date_str).unwrap();
-    let date = date.with_timezone(&Utc);
-
-    student.roles.ae = Some(date);
+    student.roles.ae = Some("star wars".to_string());
 
     db.update_student(&student).await?;
 
     let student = db.get_student(id).await?;
 
-    assert_eq!(Some(date), student.roles.ae);
+    assert_eq!(Some("star wars".to_string()), student.roles.ae);
 
     let sts = db.list_students().await?;
     assert_eq!(1, sts.len());
 
-    let film = db.insert_film("a", Priority::High).await?;
-    let film2 = db.insert_film("b", Priority::High).await?;
+    let film = db.insert_film("a", 0, Priority::High).await?;
+    let film2 = db.insert_film("b", 0, Priority::High).await?;
 
     db.insert_student_films(&student.id, &film.id).await?;
     db.insert_student_films(&student.id, &film2.id).await?;

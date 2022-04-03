@@ -29,7 +29,7 @@ pub struct Database<T: Client> {
 pub trait Client: Send + Sync + 'static {
     async fn list_films(&self) -> Result<Vec<Film>>;
     async fn get_film(&self, film_name: &str) -> Result<Option<Film>>;
-    async fn insert_film(&self, name: &str, priority: Priority) -> Result<Film>;
+    async fn insert_film(&self, name: &str, group_number: i32, priority: Priority) -> Result<Film>;
     async fn update_film(&self, film: &Film) -> Result<()>;
 
     async fn get_student_films(&self, student_id: &Uuid) -> Result<HashSet<Film>>;
@@ -37,6 +37,8 @@ pub trait Client: Send + Sync + 'static {
 
     async fn list_students(&self) -> Result<Vec<Student>>;
     async fn get_student(&self, slack_id: &str) -> Result<Student>;
+    async fn insert_student_from_csv(&self, name: &str, group: i32, class: &str)
+        -> Result<Student>;
     async fn insert_student(&self, slack_id: &str) -> Result<Student>;
     async fn update_student(&self, student: &Student) -> Result<()>;
 
@@ -72,8 +74,8 @@ impl<T: Client> Database<T> {
     }
 
     /// Inserts an empty film with no roles worked.
-    pub async fn insert_film(&self, name: &str, priority: Priority) -> Result<Film> {
-        self.client.insert_film(name, priority).await
+    pub async fn insert_film(&self, name: &str, group: i32, priority: Priority) -> Result<Film> {
+        self.client.insert_film(name, group, priority).await
     }
 
     /// Updates a film.
@@ -103,6 +105,13 @@ impl<T: Client> Database<T> {
     /// Get a student from the database. If none, insert the student and return it.
     pub async fn get_student(&self, slack_id: &str) -> Result<Student> {
         self.client.get_student(slack_id).await
+    }
+
+    #[rustfmt::skip]
+    /// From csv upload
+    async fn insert_student_from_csv(&self, name: &str, group: i32, class: &str)
+        -> Result<Student> {
+        self.client.insert_student_from_csv(name, group, class).await
     }
 
     /// Insert a student. This should ONLY be called if the student isn't in the database.

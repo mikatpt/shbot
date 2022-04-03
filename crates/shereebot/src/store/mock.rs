@@ -50,7 +50,7 @@ impl Client for MockClient {
         Err(Error::Internal(eyre!("sample error")))
     }
 
-    async fn insert_film(&self, name: &str, priority: Priority) -> Result<Film> {
+    async fn insert_film(&self, name: &str, group: i32, priority: Priority) -> Result<Film> {
         if self.success {
             return Ok(Film::default());
         }
@@ -84,6 +84,11 @@ impl Client for MockClient {
         Err(Error::Internal(eyre!("sample error")))
     }
 
+    #[rustfmt::skip]
+    async fn insert_student_from_csv(&self, name: &str, group: i32, class: &str)
+        -> Result<Student> {
+        Err(Error::Internal(eyre!("sample error")))
+    }
     async fn insert_student(&self, slack_id: &str) -> Result<Student> {
         Err(Error::Internal(eyre!("sample error")))
     }

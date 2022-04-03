@@ -1,62 +1,115 @@
 use color_eyre::Result;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
-/*
-Main goals: all we do is handle in-out.
+mod convertors;
+mod structs;
 
+pub use structs::{FilmInput, FilmOutput, StudentInput, StudentOutput};
 
-Sheree can upload a csv doc to upload all films:
-
-# films.csv
-group,film_code,priority
-
-# students.csv
-class,group,first,last
-
-There are 9 groups, each with 6 films.
-*/
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "UPPERCASE")]
-pub struct FilmInput {
-    pub code: String,
-    pub group: i32,
-    pub priority: String,
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "UPPERCASE")]
-pub struct StudentsInput {
-    pub class: String,
-    pub group: i32,
-    pub first: String,
-    pub last: String,
-}
-
-pub async fn read_film_csv(url: &str) -> Result<Vec<FilmInput>> {
+/// Read from a url into csv. This will error out if deserialization fails!
+pub async fn from_url<'a, T: for<'de> Deserialize<'de>>(url: &'a str) -> Result<Vec<T>> {
     let text = reqwest::get(url).await?.text().await?;
-    dbg!(&text);
 
     let mut films = vec![];
     let mut rdr = csv::Reader::from_reader(text.as_bytes());
     for result in rdr.deserialize() {
-        let record: FilmInput = result?;
+        let record: T = result?;
         films.push(record);
     }
 
     Ok(films)
 }
 
+/// Writes from struct into csv format.
+pub fn to_csv_string<T: Serialize>(items: Vec<T>) -> Result<String> {
+    let mut wtr = csv::Writer::from_writer(vec![]);
+
+    for item in items {
+        wtr.serialize(item)?;
+    }
+    let data = String::from_utf8(wtr.into_inner()?)?;
+
+    Ok(data)
+}
+
+/// Uploads a CSV string to slack.
+pub async fn to_slack(csv: String, title: &str, msg: &str, channel: &str) -> Result<()> {
+    let token = std::env::var("OAUTH_TOKEN")?;
+    let url = "https://slack.com/api/files.upload";
+
+    let mut params = HashMap::new();
+    params.insert("filetype", "csv");
+    params.insert("title", title);
+    params.insert("content", &csv);
+    params.insert("channels", channel);
+    params.insert("initial_comment", msg);
+
+    let client = reqwest::Client::builder().build()?;
+    client
+        .post(url)
+        .bearer_auth(token)
+        .form(&params)
+        .send()
+        .await?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[tokio::test]
+    #[ignore = "hits dropbox"]
     async fn test_read_film() -> Result<()> {
         let url = "https://www.dropbox.com/s/n41glq2a79v1xtj/sample_film_input.csv?dl=1";
 
-        let text = read_film_csv(url).await?;
+        let text: Vec<FilmInput> = from_url(url).await?;
 
         dbg!(text);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_write() -> Result<()> {
+        let s = StudentOutput {
+            class: "a".to_string(),
+            group: 1,
+            first: "a".to_string(),
+            last: "z".to_string(),
+            ae: "a".to_string(),
+            sound: "a".to_string(),
+            editor: "a".to_string(),
+            finish: "a".to_string(),
+        };
+
+        let contents = to_csv_string(vec![s])?;
+
+        let has_header = contents.contains("CLASS,GROUP,FIRST,LAST,AE,SOUND,EDITOR,FINISH");
+        assert!(has_header);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore = "Hits slack"]
+    async fn test_slack() -> Result<()> {
+        dotenv::dotenv().ok();
+        let s = StudentOutput {
+            class: "a".to_string(),
+            group: 1,
+            first: "a".to_string(),
+            last: "z".to_string(),
+            ae: "a".to_string(),
+            sound: "a".to_string(),
+            editor: "a".to_string(),
+            finish: "a".to_string(),
+        };
+
+        let contents = to_csv_string(vec![s])?;
+        to_slack(contents, "test", "Hey", "U038MGZT5T4").await?;
 
         Ok(())
     }

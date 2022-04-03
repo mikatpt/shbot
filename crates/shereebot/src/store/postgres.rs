@@ -32,7 +32,8 @@ impl Client for PostgresClient {
         let client = self.pool.get().await?;
 
         let stmt = "
-            SELECT f.id, f.name, f.priority, r.ae, r.editor, r.sound, r.color, r.current
+            SELECT f.id, f.name, f.priority, f.group_number, 
+                   r.ae, r.editor, r.sound, r.finish, r.current
             FROM films as f, roles as r 
             WHERE f.roles_id = r.id;";
         let stmt = client.prepare_cached(stmt).await?;
@@ -47,7 +48,8 @@ impl Client for PostgresClient {
         let client = self.pool.get().await?;
 
         let stmt = "
-            SELECT f.id, f.name, f.priority, r.ae, r.editor, r.sound, r.color, r.current
+            SELECT f.id, f.name, f.priority, f.group_number,
+                   r.ae, r.editor, r.sound, r.finish, r.current
             FROM films as f, roles as r 
             WHERE f.name = $1
             AND f.roles_id = r.id;";
@@ -65,13 +67,15 @@ impl Client for PostgresClient {
         Ok(film)
     }
 
-    async fn insert_film(&self, name: &str, priority: Priority) -> Result<Film> {
+    async fn insert_film(&self, name: &str, group_number: i32, priority: Priority) -> Result<Film> {
         let mut client = self.pool.get().await?;
 
         let stmt = "INSERT INTO roles(id) VALUES($1) RETURNING id;";
         let stmt = client.prepare_cached(stmt).await?;
 
-        let stmt2 = "INSERT INTO films(id, name, priority, roles_id) VALUES($1, $2, $3, $4);";
+        let stmt2 = "
+            INSERT INTO films(id, name, priority, roles_id, group_number) 
+            VALUES($1, $2, $3, $4, $5);";
         let stmt2 = client.prepare_cached(stmt2).await?;
 
         let transaction = client.transaction().await?;
@@ -84,7 +88,9 @@ impl Client for PostgresClient {
         let id = &film.id;
         let p = priority.as_ref();
 
-        let res = transaction.query(&stmt2, &[&id, &name, &p, &role_id]).await;
+        let res = transaction
+            .query(&stmt2, &[&id, &name, &p, &role_id, &group_number])
+            .await;
         if res.is_err() {
             return Err(Error::Duplicate(name.to_string()));
         }
@@ -101,7 +107,7 @@ impl Client for PostgresClient {
 
         let stmt = "
             UPDATE roles
-            SET ae = $2, editor = $3, sound = $4, color = $5, current = $6
+            SET ae = $2, editor = $3, sound = $4, finish = $5, current = $6
             WHERE id = (
                 SELECT roles_id FROM films WHERE name = $1);";
         let stmt = client.prepare_cached(stmt).await?;
@@ -112,7 +118,7 @@ impl Client for PostgresClient {
             &film.roles.ae,
             &film.roles.editor,
             &film.roles.sound,
-            &film.roles.color,
+            &film.roles.finish,
             &film.current_role.as_ref(),
         ]).await?;
 
@@ -127,7 +133,7 @@ impl Client for PostgresClient {
         let client = self.pool.get().await?;
 
         let stmt = "
-            SELECT f.id, f.name, f.priority, r.ae, r.editor, r.sound, r.color, r.current
+            SELECT f.id, f.name, f.priority, r.ae, r.editor, r.sound, r.finish, r.current
             FROM films as f 
                 JOIN roles AS r ON f.roles_id = r.id 
                 JOIN students_films on f.id = students_films.film_id
@@ -163,7 +169,8 @@ impl Client for PostgresClient {
 
         let stmt = "
             SELECT s.id, s.name, s.slack_id, s.current_film, 
-                   r.ae, r.editor, r.sound, r.color, r.current
+                   s.group_number, s.class, r.ae, r.editor,
+                   r.sound, r.finish, r.current
             FROM students as s, roles as r 
             WHERE s.roles_id = r.id;";
         let stmt = client.prepare_cached(stmt).await?;
@@ -180,7 +187,8 @@ impl Client for PostgresClient {
 
         let stmt = "
             SELECT s.id, s.name, s.slack_id, s.current_film, 
-                   r.ae, r.editor, r.sound, r.color, r.current
+                   s.group_number, s.class, r.ae, r.editor,
+                   r.sound, r.finish, r.current
             FROM students as s, roles as r 
             WHERE s.slack_id = $1
             AND s.roles_id = r.id;";
@@ -199,6 +207,48 @@ impl Client for PostgresClient {
         Ok(student)
     }
 
+    async fn insert_student_from_csv(
+        &self,
+        name: &str,
+        group: i32,
+        class: &str,
+    ) -> Result<Student> {
+        let mut client = self.pool.get().await?;
+
+        let stmt = "INSERT INTO roles(id) VALUES($1) RETURNING id;";
+        let stmt = client.prepare_cached(stmt).await?;
+
+        let stmt2 = "INSERT INTO students(id, name, roles_id, group_number, class)
+                     VALUES($1, $2, $3, $4, $5);";
+        let stmt2 = client.prepare_cached(stmt2).await?;
+
+        let transaction = client.transaction().await?;
+
+        // The whole insert should fail if the student already exists.
+        let role_id = Uuid::new_v4();
+        transaction.query(&stmt, &[&role_id]).await?;
+
+        let mut student = Student::default();
+        let id = &student.id;
+
+        let res = transaction
+            .query(&stmt2, &[&id, &name, &role_id, &group, &class])
+            .await;
+
+        if res.is_err() {
+            return Err(Error::Duplicate(name.to_string()));
+        }
+        transaction.commit().await?;
+
+        info!("Inserted student: {}", name);
+        student.name = name.to_string();
+        student.group_number = group;
+        student.class = class.to_string();
+
+        Ok(student)
+    }
+
+    // TODO: convert this to ONLY update slack id.
     async fn insert_student(&self, slack_id: &str) -> Result<Student> {
         // Get student name from slack api
         let client = reqwest::Client::builder().build()?;
@@ -249,7 +299,7 @@ impl Client for PostgresClient {
 
         let stmt = "
             UPDATE roles
-            SET ae = $2, editor = $3, sound = $4, color = $5, current = $6
+            SET ae = $2, editor = $3, sound = $4, finish = $5, current = $6
             WHERE id = (
                 SELECT roles_id FROM students WHERE id = $1);";
         let stmt = client.prepare_cached(stmt).await?;
@@ -265,7 +315,7 @@ impl Client for PostgresClient {
             &student.roles.ae,
             &student.roles.editor,
             &student.roles.sound,
-            &student.roles.color,
+            &student.roles.finish,
             &student.current_role.as_ref(),
         ]).await?;
 
@@ -410,15 +460,15 @@ fn format_row_into_film(row: Row) -> Result<Film> {
     let name: String = row.get("name");
     let priority = Priority::from_str(row.get("priority"))?;
     let role = Role::from_str(row.get("current"))?;
+    let group_number: i32 = row.get("group_number");
 
-    let roles: [Option<DateTime<Utc>>; 4] = [
-        row.get("ae"),
-        row.get("editor"),
-        row.get("sound"),
-        row.get("color"),
-    ];
-    let roles = Roles::new(roles[0], roles[1], roles[2], roles[3]);
-    Ok(Film::new(id, name, role, priority, roles))
+    let ae: Option<String> = row.get("ae");
+    let editor: Option<String> = row.get("editor");
+    let sound: Option<String> = row.get("sound");
+    let finish: Option<String> = row.get("finish");
+
+    let roles = Roles::new(ae, editor, sound, finish);
+    Ok(Film::new(id, name, role, priority, roles, group_number))
 }
 
 fn format_row_into_student(row: Row) -> Result<Student> {
@@ -428,16 +478,20 @@ fn format_row_into_student(row: Row) -> Result<Student> {
     let current_film: Option<String> = row.get("current_film");
     let current_role = Role::from_str(row.get("current"))?;
 
-    let roles: [Option<DateTime<Utc>>; 4] = [
-        row.get("ae"),
-        row.get("editor"),
-        row.get("sound"),
-        row.get("color"),
-    ];
-    let roles = Roles::new(roles[0], roles[1], roles[2], roles[3]);
+    let ae: Option<String> = row.get("ae");
+    let editor: Option<String> = row.get("editor");
+    let sound: Option<String> = row.get("sound");
+    let finish: Option<String> = row.get("finish");
+    let group_number: i32 = row.get("group_number");
+    let class: String = row.get("class");
+
+    let roles = Roles::new(ae, editor, sound, finish);
 
     #[rustfmt::skip]
-    let student = Student { id, name, slack_id, current_film, current_role, roles };
+    let student = Student { 
+        id, name, slack_id, current_film, 
+        current_role, roles, group_number, class,
+    };
 
     Ok(student)
 }

@@ -10,12 +10,12 @@ DO $schema$ BEGIN
     RAISE INFO 'Creating tables';
     CREATE TABLE IF NOT EXISTS roles (
         id              UUID PRIMARY KEY,
-        current         TEXT NOT NULL DEFAULT 'Ae',
-        -- These mark completion times.
-        ae              TIMESTAMPTZ,
-        editor          TIMESTAMPTZ,
-        sound           TIMESTAMPTZ,
-        color           TIMESTAMPTZ,
+        current         TEXT NOT NULL DEFAULT 'AE',
+        -- The film/student who worked this role.
+        ae              TEXT,
+        editor          TEXT,
+        sound           TEXT,
+        finish          TEXT,
         updated_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -23,7 +23,8 @@ DO $schema$ BEGIN
         id              UUID PRIMARY KEY,
         roles_id        UUID REFERENCES roles,
         name            TEXT NOT NULL UNIQUE,
-        priority        TEXT NOT NULL DEFAULT 'High',
+        priority        TEXT NOT NULL DEFAULT 'HIGH',
+        group_number    INTEGER NOT NULL,
         created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
@@ -32,8 +33,10 @@ DO $schema$ BEGIN
         id              UUID PRIMARY KEY,
         name            TEXT NOT NULL DEFAULT '',
         roles_id        UUID REFERENCES roles,
-        slack_id        TEXT NOT NULL UNIQUE,
+        slack_id        TEXT NOT NULL DEFAULT '',
         current_film    TEXT,
+        group_number    INTEGER NOT NULL DEFAULT 0,
+        class           TEXT NOT NULL DEFAULT '0',
         created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
@@ -77,7 +80,7 @@ DO $schema$ BEGIN
     CREATE UNIQUE INDEX IF NOT EXISTS film_name_idx
         ON films(name);
 
-    CREATE UNIQUE INDEX IF NOT EXISTS std_slack_id_idx
+    CREATE INDEX IF NOT EXISTS std_slack_id_idx
         ON students(slack_id);
 
 

@@ -97,7 +97,10 @@ impl<T: Client> FilmManager<T> {
     /// Insert empty film to the database and to the jobs_q
     #[tracing::instrument(skip(self))]
     pub async fn insert_films(&self, message: &str) -> String {
-        let (priority, film_names) = message.trim().split_once(' ').unwrap_or_default();
+        // TODO: These three lines are temp hacks.
+        let (priority, rest) = message.trim().split_once(' ').unwrap_or_default();
+        let (group, film_names) = rest.split_once(' ').unwrap_or_default();
+        let group = group.parse::<i32>().unwrap_or_default();
 
         info!("Inserting {priority} priority films");
 
@@ -118,7 +121,7 @@ impl<T: Client> FilmManager<T> {
             .map(|film_name| {
                 let s = self.state.clone();
                 tokio::spawn(async move {
-                    match s.db.insert_film(&film_name, priority).await {
+                    match s.db.insert_film(&film_name, group, priority).await {
                         Ok(f) => match s.queue.insert_job(&f, "").await {
                             Ok(_) => Ok(f),
                             Err(e) => {
