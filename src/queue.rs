@@ -145,6 +145,36 @@ impl<T: Client> Queue<T> {
         }
 
         info!("Trying to assign job: now retrieving all films student has worked!");
+        // NOTE: We need to add some more logic here.
+        //
+        // A student should not work the same job twice, unless this is not possible.
+        //
+        // first, last = slack.get_first_last(slack_id);
+        //
+        // group = db.get_group(first,last)
+        //
+        // override_unique = db.unique_films_remain(role, group, student_id)
+        //
+        //  I did pre for [a, b, c]
+        //  I did ae for [d]
+        //  I want to not be editor for any of the above.
+        //  If there are films I did NOT do pre for that have editor avail,
+        //  and I have NOT done post for those films, we're all good.
+        //
+        //  Films I didn't do pre for:
+        //  SELECT * FROM films where group != 1 AND editor == null
+        //
+        //  Films I did post for:
+        //  SELECT * FROM films
+        //      JOIN roles on roles.id = films.roles_id
+        //      JOIN students_films ON films.id = students_films.film_id
+        //      WHERE students_films.student_id = student_id;
+        //
+        //  If pre.len > 0 and pre.has(films not in post), not unique.
+        //
+        // track films for each category?
+        let override_unique = false;
+
         let student_films = self.db.get_student_films(&student.id).await?;
         let worked_films: HashSet<_> = student_films.iter().map(|f| f.name.clone()).collect();
 
@@ -152,7 +182,9 @@ impl<T: Client> Queue<T> {
         let role = student.current_role;
 
         info!("Searching for eligible jobs...");
-        let job_to_do = self.get_job(worked_films, slack_id, role).await;
+        let job_to_do = self
+            .get_job(worked_films, slack_id, role, override_unique)
+            .await;
 
         // If there was no suitable job found, insert student into the wait queue
         if job_to_do.is_none() {
@@ -186,6 +218,7 @@ impl<T: Client> Queue<T> {
         worked_films: HashSet<String>,
         slack_id: &str,
         role: Role,
+        override_unique: bool,
     ) -> Option<QueueItem> {
         let mut work_q = self.jobs_q.lock().await;
         let mut recycle = vec![];
@@ -201,7 +234,7 @@ impl<T: Client> Queue<T> {
             let worked_on = same_id || worked_on_film;
             let eligible = job.role == role;
 
-            if eligible && !worked_on {
+            if eligible && (override_unique || !worked_on) {
                 eligible_job = Some(job);
                 break;
             } else {
