@@ -87,14 +87,6 @@ student_roles
     - FK student_id
     - FK role_id
 
-// Sheree can upload a csv doc to upload all films:
-//
-// # films.csv
-// group,film_code,priority
-//
-// # students.csv
-// class,group,first,last
-
 TODO:
     - Pass slack id in as channel to directly PM 
     - Let sheree @ slackbot with a csv file

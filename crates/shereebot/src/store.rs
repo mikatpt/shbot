@@ -6,11 +6,8 @@ use deadpool_postgres::Runtime::Tokio1;
 use tokio_postgres::NoTls;
 use uuid::Uuid;
 
-use crate::{
-    models::{Film, Priority, Student},
-    queue::QueueItem,
-    Result,
-};
+use crate::{queue::QueueItem, Result};
+use models::{Film, Priority, Student};
 
 pub mod postgres;
 pub use postgres::PostgresClient;

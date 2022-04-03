@@ -10,13 +10,13 @@ use tracing::{debug, error, info};
 
 use crate::{
     films::FilmManager,
-    models::Film,
     server::{Result, State},
     slack::events::EventRequest,
     slack::slash::{ResponseType, SlashRequest, SlashResponse},
     store::Client,
     Error,
 };
+use models::Film;
 
 /// Just for testing poorly documented slack endpoints.
 pub(super) async fn testing<T: Client>(body: Bytes) -> Result<Json<SlashResponse>> {

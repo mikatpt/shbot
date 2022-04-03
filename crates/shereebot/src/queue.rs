@@ -7,13 +7,12 @@ use futures::lock::Mutex;
 use tracing::info;
 use uuid::Uuid;
 
-use crate::models::Student;
 use crate::store::mock::MockClient;
 use crate::{
-    models::{Film, Priority, Role},
     store::{Client, Database},
     Error, Result,
 };
+use models::{Film, Priority, Role, Student};
 
 #[derive(Debug)]
 pub(crate) struct Queue<T: Client> {

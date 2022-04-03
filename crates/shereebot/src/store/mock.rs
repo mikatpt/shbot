@@ -7,11 +7,11 @@ use color_eyre::eyre::eyre;
 use uuid::Uuid;
 
 use crate::{
-    models::{Film, Priority, Student},
     queue::QueueItem,
     store::{Client, Database},
     Error, Result,
 };
+use models::{Film, Priority, Student};
 
 #[derive(Debug)]
 pub struct MockClient {

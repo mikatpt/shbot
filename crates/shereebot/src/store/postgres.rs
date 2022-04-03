@@ -9,13 +9,8 @@ use tokio_postgres::Row;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
-use crate::{
-    models::{Film, Priority, Role, Roles, Student},
-    queue::QueueItem,
-    slack::UserResponse,
-    store::Client,
-    Error, Result,
-};
+use crate::{queue::QueueItem, slack::UserResponse, store::Client, Error, Result};
+use models::{Film, Priority, Role, Roles, Student};
 
 /// Internal Postgres client.
 pub struct PostgresClient {

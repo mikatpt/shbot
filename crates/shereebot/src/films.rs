@@ -6,9 +6,9 @@ use itertools::Itertools;
 use tracing::{debug, error, info};
 
 use crate::{
-    models::Priority, queue::QueueItem, server::State, slack::app_mentions::Response,
-    store::Client, Error, Result,
+    queue::QueueItem, server::State, slack::app_mentions::Response, store::Client, Error, Result,
 };
+use models::Priority;
 
 pub(crate) struct FilmManager<T: Client> {
     state: State<T>,

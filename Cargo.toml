@@ -1,5 +1,7 @@
 [workspace]
 
 members = [
-    "crates/shereebot"
+    "crates/shereebot",
+    "crates/csv-parser",
+    "crates/models"
 ]
