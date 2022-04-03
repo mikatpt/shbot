@@ -16,16 +16,13 @@ pub struct Film {
 }
 
 impl Film {
-    #[rustfmt::skip]
-    pub fn new(
-        id: Uuid,
-        name: String,
-        current_role: Role,
-        priority: Priority,
-        roles: Roles,
-        group_number: i32,
-    ) -> Self {
-        Film { id, name, current_role, priority, roles, group_number }
+    pub fn new(name: &str, priority: Priority, group_number: i32) -> Self {
+        Film {
+            name: name.to_string(),
+            priority,
+            group_number,
+            ..Default::default()
+        }
     }
 
     /// Increments role and returns it.

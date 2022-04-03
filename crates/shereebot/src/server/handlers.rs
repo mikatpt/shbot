@@ -1,18 +1,11 @@
-use axum::{
-    body::Bytes,
-    extract::{Extension, Form},
-    http::StatusCode,
-    response::Html,
-    Json,
-};
+use axum::{body::Bytes, extract::Extension, http::StatusCode, response::Html, Json};
 use serde_json::Value;
 use tracing::{debug, error, info};
 
 use crate::{
-    films::FilmManager,
     server::{Result, State},
     slack::events::EventRequest,
-    slack::slash::{ResponseType, SlashRequest, SlashResponse},
+    slack::slash::{ResponseType, SlashResponse},
     store::Client,
     Error,
 };
@@ -71,16 +64,16 @@ pub(super) async fn list_films<T: Client>(
     }
 }
 
-#[tracing::instrument(skip_all)]
-pub(super) async fn insert_films<T: Client>(
-    form: Form<SlashRequest>,
-    Extension(state): Extension<State<T>>,
-) -> Result<Json<SlashResponse>> {
-    let slash_command = form.0;
+// #[tracing::instrument(skip_all)]
+// pub(super) async fn insert_films<T: Client>(
+//     form: Form<SlashRequest>,
+//     Extension(state): Extension<State<T>>,
+// ) -> Result<Json<SlashResponse>> {
+//     let slash_command = form.0;
 
-    let manager = FilmManager::new(state);
-    let msg = manager.insert_films(&slash_command.text).await;
-    let res = SlashResponse::new(msg, Some(ResponseType::Ephemeral));
+//     let manager = FilmManager::new(state);
+//     let msg = manager.insert_films(&slash_command.text).await;
+//     let res = SlashResponse::new(msg, Some(ResponseType::Ephemeral));
 
-    Ok(Json(res))
-}
+//     Ok(Json(res))
+// }

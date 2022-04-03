@@ -85,7 +85,8 @@ fn new_router<T: Client>(state: State<T>) -> Router {
         .route("/", get(handlers::home))
         .route(
             "/films",
-            get(handlers::list_films::<T>).post(handlers::insert_films::<T>),
+            get(handlers::list_films::<T>),
+            // .post(handlers::insert_films::<T>),
         )
         .route("/events", post(handlers::events_api_entrypoint::<T>))
         .route("/_health", get(health_check))

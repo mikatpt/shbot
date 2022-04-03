@@ -10,6 +10,9 @@ path = "src/main.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+csv-parser = { path = "../csv-parser" }
+models = { path = "../models" }
+
 async-trait = "0.1.53"
 axum = "0.4.8"
 axum-macros = "0.1.2"
@@ -20,7 +23,6 @@ deadpool-postgres = { version = "0.10.0", features = ["serde"] }
 dotenv = "0.15"
 futures = "0.3"
 itertools = "0.10.3"
-models = { path = "../models" }
 reqwest = { version = "0.11.10", features = ["json"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1.0"

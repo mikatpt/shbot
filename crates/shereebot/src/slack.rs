@@ -1,5 +1,6 @@
 pub mod app_mentions;
 pub mod events;
+pub mod message;
 pub mod slash;
 
 use serde::{Deserialize, Serialize};

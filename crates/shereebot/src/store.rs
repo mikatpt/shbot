@@ -109,7 +109,7 @@ impl<T: Client> Database<T> {
 
     #[rustfmt::skip]
     /// From csv upload
-    async fn insert_student_from_csv(&self, name: &str, group: i32, class: &str)
+    pub async fn insert_student_from_csv(&self, name: &str, group: i32, class: &str)
         -> Result<Student> {
         self.client.insert_student_from_csv(name, group, class).await
     }

@@ -1,8 +1,9 @@
+#![allow(dead_code)]
 use serde::{Deserialize, Serialize};
 use strum::AsRefStr;
 use tracing::{error, info};
 
-use crate::{server::State, store::Client, Result};
+use crate::{server::State, store::Client, Error, Result};
 
 /// This challenge is sent when the Event API first queries your event endpoint.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -42,6 +43,12 @@ pub enum EventType {
 }
 
 #[derive(Debug, Clone, AsRefStr, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ChannelType {
+    AppHome,
+}
+
+#[derive(Debug, Clone, AsRefStr, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case", tag = "type")]
 pub enum Event {
     AppMention {
@@ -51,17 +58,33 @@ pub enum Event {
         channel: String,
         event_ts: String,
     },
+    Message {
+        user: String,
+        text: String,
+        channel_type: ChannelType,
+        subtype: Option<String>,
+        files: Option<Vec<File>>,
+    },
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct File {
+    pub id: String,
+    pub name: String,
+    pub filetype: String,
+    pub url_private: String,
+    pub url_private_download: String,
 }
 
 impl EventRequest {
-    /// Once an event is called, we can handle it totally async.
+    /// We handle events totally asynchronously, dispatching them back to slack via POST.
     ///
     /// Normally, we log errors right before reporting them to the user.
     /// Since this can be a long-running task, we will log errors here.
     pub(crate) async fn handle_event<T: Client>(self, state: State<T>) {
         let result = match self.event {
             Event::AppMention { .. } => self.handle_app_mention(state).await,
-            // _ => Ok(()),
+            Event::Message { .. } => self.handle_message(state).await,
         };
         match result {
             Ok(_) => info!("Completed event!"),
@@ -69,19 +92,35 @@ impl EventRequest {
         }
     }
 
+    async fn handle_message<T: Client>(self, state: State<T>) -> Result<()> {
+        let (user, channel_type, text, subtype, files) = if let Event::Message {
+            user,
+            channel_type,
+            text,
+            subtype,
+            files,
+        } = self.event
+        {
+            (user, channel_type, text, subtype, files)
+        } else {
+            return Err(Error::Unreachable);
+        };
+        let manager = super::message::Message::new(state, user, text, channel_type, subtype, files);
+        manager.handle_event().await?;
+        Ok(())
+    }
+
     /// Entry gateway for mentions: branch out based on the parsed operation request.
     async fn handle_app_mention<T: Client>(self, state: State<T>) -> Result<()> {
-        let manager = super::app_mentions::AppMention::new(state.clone(), self.event);
+        #[rustfmt::skip]
+        let (user, ts, channel, text) = if let Event::AppMention { user, ts, channel, text, .. } = self.event {
+            (user, ts, channel, text)
+        } else {
+            return Err(Error::Unreachable);
+        };
+        let manager = super::app_mentions::AppMention::new(state.clone(), text, ts, channel, user);
 
-        let res = manager.handle_event().await?;
-
-        state
-            .req_client
-            .post("https://slack.com/api/chat.postMessage")
-            .bearer_auth(&state.oauth_token)
-            .json(&res)
-            .send()
-            .await?;
+        manager.handle_event().await?;
 
         Ok(())
     }

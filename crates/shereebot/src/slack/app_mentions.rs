@@ -1,13 +1,12 @@
 use std::str::FromStr;
 
 use itertools::Itertools;
+use models::{Film, Priority};
 use serde::{Deserialize, Serialize};
 use strum::EnumString;
 use tracing::debug;
 
-use crate::{
-    films::FilmManager, server::State, slack::events::Event, store::Client, Error, Result,
-};
+use crate::{manager::Manager, server::State, store::Client, Error, Result};
 
 const HELLO: &str =
     ":wave: Hi! I'm ShereeBot. Sheree's brother built me to help her manage your film assignments!
@@ -27,13 +26,22 @@ Sheree can also run the `add-films` command!";
 /// Manager which handles all app_mention events.
 pub(crate) struct AppMention<T: Client> {
     state: State<T>,
-    event: Event,
+    text: String,
+    ts: String,
+    channel: String,
+    user: String,
 }
 
 impl<T: Client> AppMention<T> {
     #[rustfmt::skip]
-    pub(crate) fn new(state: State<T>, event: Event) -> Self {
-        Self { state, event }
+    pub(crate) fn new(
+        state: State<T>,
+        text: String,
+        ts: String,
+        channel: String,
+        user: String,
+    ) -> Self {
+        Self { state, text, ts, channel, user }
     }
 
     /// Given an app_mention event, does the following:
@@ -42,33 +50,49 @@ impl<T: Client> AppMention<T> {
     /// 2. Runs the requested command.
     /// 3. Returns a formatted `Response` with either an error or success msg
     #[tracing::instrument(name = "app_mention", skip_all)]
-    pub(crate) async fn handle_event(&self) -> Result<Response> {
-        debug!("[handle_event]: {:?}", self.event);
+    pub(crate) async fn handle_event(&self) -> Result<()> {
+        debug!("[handle_event]: {:?}", self.text);
+        let (ts, channel) = (self.ts.clone(), self.channel.clone());
 
-        #[rustfmt::skip]
-        let Event::AppMention { ts, channel, text, .. } = &self.event;
-        let (ts, channel) = (ts.clone(), channel.clone());
+        let res = match self.run_event().await {
+            Ok(msg) => Response::new(channel, msg, Some(ts)),
+            Err(e) => Response::new(channel, e.to_string(), Some(ts)),
+        };
 
-        if text.split_whitespace().nth(1).is_none() {
-            return Ok(Response::new(channel, HELLO.to_string(), None));
+        self.state
+            .req_client
+            .post("https://slack.com/api/chat.postMessage")
+            .bearer_auth(&self.state.oauth_token)
+            .json(&res)
+            .send()
+            .await?;
+
+        Ok(())
+    }
+
+    async fn run_event(&self) -> Result<String> {
+        if self.text.split_whitespace().nth(1).is_none() {
+            return Ok(HELLO.to_string());
         }
 
         let cmd = match self.parse_command() {
             Ok(c) => c,
-            Err(_) => return Ok(Response::new(channel, CMD_ERR.to_string(), Some(ts))),
+            Err(e) => return Ok(e.to_string()),
         };
 
-        let msg = self.run_command(cmd).await;
-        Ok(Response::new(channel, msg, Some(ts)))
+        match self.run_command(cmd).await {
+            Ok(msg) => Ok(msg),
+            Err(e) => Ok(e.to_string()),
+        }
     }
 
     /// Parse the event text for a command.
     ///
     /// Format: "<USER_ID> COMMAND MESSAGE"
-    /// Example: "<@U0LAN0Z89> addfilms star wars, star trek"
+    /// Example: "<@U0LAN0Z89> addfilms HIGH 1 star wars, star trek"
     fn parse_command(&self) -> Result<Command> {
-        let Event::AppMention { text, .. } = &self.event;
-        let cmd = text
+        let cmd = self
+            .text
             .split_whitespace()
             .nth(1)
             .ok_or_else(|| Error::InvalidArg(CMD_ERR.into()))?;
@@ -76,20 +100,35 @@ impl<T: Client> AppMention<T> {
         Ok(Command::from_str(cmd)?)
     }
 
-    async fn run_command(&self, cmd: Command) -> String {
-        #[rustfmt::skip]
-        let Event::AppMention { text, ts, channel, user, .. } = &self.event;
-
-        let manager = FilmManager::new(self.state.clone());
+    async fn run_command(&self, cmd: Command) -> Result<String> {
+        let manager = Manager::new(self.state.clone());
         match cmd {
             Command::AddFilms => {
+                // <USER_ID> addfilms <PRI> <GROUP> <FILMS>
                 let msg: String =
-                    Itertools::intersperse(text.split_whitespace().skip(2), " ").collect();
-                manager.insert_films(&msg).await
+                    Itertools::intersperse(self.text.split_whitespace().skip(2), " ").collect();
+                let (priority, rest) = msg
+                    .split_once(' ')
+                    .ok_or_else(|| Error::InvalidArg(CMD_ERR.into()))?;
+
+                let (group, films) = rest
+                    .split_once(' ')
+                    .ok_or_else(|| Error::InvalidArg(CMD_ERR.into()))?;
+                let priority = Priority::from_str(priority)?;
+                let group = group.parse::<i32>().unwrap_or_default();
+
+                let films: Vec<Film> = films
+                    .split(',')
+                    .map(|s| Film::new(s.trim(), priority, group))
+                    .collect();
+
+                Ok(manager.insert_films(films).await)
             }
-            Command::Help => HELP.to_string(),
-            Command::RequestWork => manager.request_work(user, ts, channel).await,
-            Command::DeliverWork => manager.deliver_work(user).await,
+            Command::Help => Ok(HELP.to_string()),
+            Command::RequestWork => Ok(manager
+                .request_work(&self.user, &self.ts, &self.channel)
+                .await),
+            Command::DeliverWork => Ok(manager.deliver_work(&self.user).await),
         }
     }
 }
@@ -115,9 +154,12 @@ pub struct Response {
 }
 
 impl Response {
-    #[rustfmt::skip]
     pub fn new(channel: String, text: String, thread_ts: Option<String>) -> Self {
-        Self { channel, text, thread_ts }
+        Self {
+            channel,
+            text,
+            thread_ts,
+        }
     }
 }
 
@@ -127,22 +169,21 @@ mod tests {
     use crate::{server::InnerState, store::mock::MockClient};
 
     fn setup() -> AppMention<MockClient> {
-        let event = Event::AppMention {
+        let state = InnerState::<MockClient>::_new();
+        AppMention {
+            state,
             user: "".to_string(),
             ts: "".to_string(),
             channel: "".to_string(),
             text: "".to_string(),
-            event_ts: "".to_string(),
-        };
-        let state = InnerState::<MockClient>::_new();
-        AppMention { state, event }
+        }
     }
 
     #[test]
     fn get_command() {
         let mut m = setup();
-        let Event::AppMention { text, .. } = &mut m.event;
-        *text = "<@U0LAN0Z89> addfilms star wars, star trek".to_string();
+
+        m.text = "<@U0LAN0Z89> addfilms star wars, star trek".to_string();
         let command = m.parse_command();
         assert!(command.is_ok());
     }

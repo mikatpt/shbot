@@ -36,6 +36,8 @@ pub enum Error {
     ReqwestError(#[from] reqwest::Error),
     #[error(transparent)]
     EnvVarError(#[from] std::env::VarError),
+    #[error("Unreachable.")]
+    Unreachable,
 }
 
 /// All error types reported to the end user.

@@ -3,7 +3,7 @@ pub mod queue;
 pub mod server;
 pub mod store;
 
-mod films;
+mod manager;
 mod slack;
 mod utils;
 

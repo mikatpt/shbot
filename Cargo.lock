@@ -1728,6 +1728,7 @@ dependencies = [
  "chrono",
  "color-eyre",
  "console-subscriber",
+ "csv-parser",
  "deadpool-postgres",
  "dotenv",
  "futures",

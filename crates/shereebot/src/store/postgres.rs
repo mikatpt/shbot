@@ -459,7 +459,7 @@ fn format_row_into_film(row: Row) -> Result<Film> {
     let id: Uuid = row.get("id");
     let name: String = row.get("name");
     let priority = Priority::from_str(row.get("priority"))?;
-    let role = Role::from_str(row.get("current"))?;
+    let current_role = Role::from_str(row.get("current"))?;
     let group_number: i32 = row.get("group_number");
 
     let ae: Option<String> = row.get("ae");
@@ -468,7 +468,14 @@ fn format_row_into_film(row: Row) -> Result<Film> {
     let finish: Option<String> = row.get("finish");
 
     let roles = Roles::new(ae, editor, sound, finish);
-    Ok(Film::new(id, name, role, priority, roles, group_number))
+    Ok(Film {
+        id,
+        name,
+        current_role,
+        priority,
+        roles,
+        group_number,
+    })
 }
 
 fn format_row_into_student(row: Row) -> Result<Student> {
