@@ -35,7 +35,8 @@ fn pg_conf() -> deadpool_postgres::Config {
 async fn setup() -> Result<Database<PostgresClient>> {
     INIT.call_once(|| {
         env::set_var("ENVIRONMENT", "test");
-        env::set_var("RUST_LOG", "shbot=trace,tower=trace,tower_http=trace");
+        // set to trace to debug things
+        env::set_var("RUST_LOG", "shbot=error,tower=trace,tower_http=trace");
 
         dotenv::dotenv().ok();
         logger::install(None);
@@ -44,7 +45,7 @@ async fn setup() -> Result<Database<PostgresClient>> {
 
     let client = pool.get().await?;
 
-    let statement = include_str!("../../../schema.sql");
+    let statement = include_str!("./test_schema.sql");
     client.batch_execute(statement).await?;
 
     let db = Database::<PostgresClient>::new(&pg_conf())?;
@@ -57,8 +58,8 @@ async fn setup() -> Result<Database<PostgresClient>> {
 async fn films() -> Result<()> {
     let db = setup().await?;
 
-    db.insert_film("b", 0, Priority::High).await?;
-    let mut film = db.insert_film("a", 0, Priority::High).await?;
+    db.insert_film("b", 1, Priority::High).await?;
+    let mut film = db.insert_film("a", 1, Priority::High).await?;
     assert_eq!("a", film.name);
 
     film.roles.ae = Some("mikatpt".to_string());
@@ -101,7 +102,7 @@ async fn students() -> Result<()> {
     db.insert_student_films(&student.id, &film.id).await?;
     db.insert_student_films(&student.id, &film2.id).await?;
 
-    let films = db.get_student_films(&student.id).await?;
+    let films = db.get_worked_films(&student.id).await?;
     assert!(films.contains(&film));
     assert!(films.contains(&film2));
 

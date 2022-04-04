@@ -23,7 +23,7 @@ pub struct EventRequest {
 
     #[serde(rename = "type")]
     pub event_type: EventType,
-    pub authorizations: Vec<serde_json::Value>,
+    pub authorizations: Vec<Authorization>,
 
     pub event_context: String,
     pub event_id: String,
@@ -33,6 +33,11 @@ pub struct EventRequest {
     pub authed_users: Option<Vec<String>>,
     #[deprecated]
     pub authed_teams: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Authorization {
+    pub is_bot: bool,
 }
 
 #[derive(Debug, Clone, AsRefStr, Deserialize, Serialize)]
@@ -106,6 +111,7 @@ impl EventRequest {
         } else {
             return Err(Error::Unreachable);
         };
+
         let manager = super::message::Message::new(state, user, text, channel_type, subtype, files);
         manager.handle_event().await?;
         Ok(())

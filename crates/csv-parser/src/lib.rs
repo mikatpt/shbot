@@ -10,7 +10,17 @@ pub use structs::{FilmInput, FilmOutput, StudentInput, StudentOutput};
 
 /// Read from a url into csv. This will error out if deserialization fails!
 pub async fn from_url<'a, T: for<'de> Deserialize<'de>>(url: &'a str) -> Result<Vec<T>> {
-    let text = reqwest::get(url).await?.text().await?;
+    let token = std::env::var("OAUTH_TOKEN")?;
+    let client = reqwest::Client::builder().build()?;
+    let text = client
+        .get(url)
+        .bearer_auth(&token)
+        .send()
+        .await?
+        .text()
+        .await?;
+    let bytes = text.as_str();
+    dbg!(bytes);
 
     let mut films = vec![];
     let mut rdr = csv::Reader::from_reader(text.as_bytes());
@@ -76,6 +86,16 @@ mod tests {
         Ok(())
     }
 
+    #[tokio::test]
+    #[ignore = "test slack"]
+    async fn test_read() -> Result<()> {
+        dotenv::dotenv().ok();
+        let url = "https://files.slack.com/files-pri/T038MGR9PDH-F039QA7KDLN/sample_film_input.csv";
+        let text: Vec<FilmInput> = from_url(url).await?;
+        dbg!(text);
+        Ok(())
+    }
+
     #[test]
     fn test_write() -> Result<()> {
         let s = StudentOutput {
@@ -98,7 +118,7 @@ mod tests {
     }
 
     #[tokio::test]
-    // #[ignore = "Hits slack"]
+    #[ignore = "Hits slack"]
     async fn test_slack() -> Result<()> {
         dotenv::dotenv().ok();
         let s = StudentOutput {

@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use color_eyre::eyre::eyre;
 use deadpool_postgres::Pool;
 use tokio_postgres::Row;
-use tracing::{debug, info, warn};
+use tracing::{info, trace, warn};
 use uuid::Uuid;
 
 use crate::{queue::QueueItem, slack::UserResponse, store::Client, Error, Result};
@@ -133,7 +133,8 @@ impl Client for PostgresClient {
         let client = self.pool.get().await?;
 
         let stmt = "
-            SELECT f.id, f.name, f.priority, r.ae, r.editor, r.sound, r.finish, r.current
+            SELECT f.id, f.name, f.priority, f.group_number, 
+                   r.ae, r.editor, r.sound, r.finish, r.current
             FROM films as f 
                 JOIN roles AS r ON f.roles_id = r.id 
                 JOIN students_films on f.id = students_films.film_id
@@ -144,7 +145,7 @@ impl Client for PostgresClient {
 
         let res: Result<HashSet<_>> = rows.into_iter().map(format_row_into_film).collect();
         let res = res?;
-        info!("Retrieved {} rows from students_films", res.len());
+        info!("Retrieved {} worked films", res.len());
 
         Ok(res)
     }
@@ -162,13 +163,14 @@ impl Client for PostgresClient {
     }
 
     async fn get_films_exclusionary(&self, group: i32, role: Role) -> Result<Vec<Film>> {
+        info!("Retrieving eligible films");
         let client = self.pool.get().await?;
 
         let role = role.as_ref().to_lowercase();
 
         let stmt = format!(
             "
-            SELECT DISTINCT f.name, f.priority, f.group_number, 
+            SELECT DISTINCT f.id, f.name, f.priority, f.group_number, 
                    r.ae, r.editor, r.sound, r.finish, r.current
             FROM films as f, roles as r 
             WHERE f.group_number != $1 AND r.{role} IS NULL;"
@@ -202,7 +204,7 @@ impl Client for PostgresClient {
     }
 
     async fn get_student(&self, slack_id: &str) -> Result<Student> {
-        debug!("Retrieving student with id {slack_id}");
+        info!("Retrieving student with id {slack_id}");
         let client = self.pool.get().await?;
 
         let stmt = "
@@ -492,6 +494,7 @@ impl Client for PostgresClient {
 // ------------- Helpers ------------- //
 
 fn format_row_into_film(row: Row) -> Result<Film> {
+    trace!("formatting film row {row:?}");
     let id: Uuid = row.get("id");
     let name: String = row.get("name");
     let priority = Priority::from_str(row.get("priority"))?;
@@ -515,6 +518,7 @@ fn format_row_into_film(row: Row) -> Result<Film> {
 }
 
 fn format_row_into_student(row: Row) -> Result<Student> {
+    trace!("formatting student row {row:?}");
     let id: Uuid = row.get("id");
     let name: String = row.get("name");
     let slack_id: String = row.get("slack_id");

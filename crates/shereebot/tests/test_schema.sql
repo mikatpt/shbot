@@ -1,8 +1,4 @@
 ---- Schema ----
-CREATE DATABASE shereebot;
-
-\c shereebot;
-\set ON_ERROR_STOP true
 
 DO $schema$ BEGIN 
     RAISE INFO 'Populating schema';
@@ -113,3 +109,10 @@ DO $schema$ BEGIN
         FOR EACH ROW
         EXECUTE PROCEDURE update_timestamp();
 END $schema$;
+
+TRUNCATE TABLE roles CASCADE;
+TRUNCATE TABLE films CASCADE;
+TRUNCATE TABLE jobs_q CASCADE;
+TRUNCATE TABLE wait_q CASCADE;
+TRUNCATE TABLE students_films CASCADE;
+TRUNCATE TABLE students CASCADE;

@@ -1,6 +1,6 @@
 use axum::{body::Bytes, extract::Extension, http::StatusCode, response::Html, Json};
 use serde_json::Value;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, trace};
 
 use crate::{
     server::{Result, State},
@@ -36,11 +36,17 @@ pub(super) async fn events_api_entrypoint<T: Client>(
         info!("Auth challenge received");
         return Ok((StatusCode::OK, challenge.to_string()));
     }
+    trace!("req: {:?}", request.as_object());
 
     let request: EventRequest = serde_json::from_value(request).map_err(|e| -> Error {
         error!("{e}");
         e.into()
     })?;
+
+    // ignore bot events to avoid infinite loop.
+    if request.authorizations[0].is_bot {
+        return Ok((StatusCode::OK, "".to_string()));
+    }
 
     tokio::spawn(request.handle_event(state));
 

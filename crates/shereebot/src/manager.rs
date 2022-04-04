@@ -1,9 +1,10 @@
+#![allow(dead_code)]
 use std::collections::HashSet;
 
 use csv_parser::{FilmInput, StudentInput};
 use futures::{future, stream::FuturesUnordered};
 use itertools::Itertools;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, trace};
 
 use crate::{
     queue::QueueItem,
@@ -25,9 +26,9 @@ Then, I'll message you back when there's a job ready for you.";
 
 const INTERNAL_ERR: &str = "Something went wrong internally - please let Sheree know!";
 
-const PRI_ERR: &str = "I couldn't read your command :cry:
-Valid priority weights are `HIGH` and `LOW`.
-Ex: `insert-films HIGH film1, film2, film3`";
+// const PRI_ERR: &str = "I couldn't read your command :cry:
+// Valid priority weights are `HIGH` and `LOW`.
+// Ex: `insert-films HIGH film1, film2, film3`";
 
 const NO_WORK: &str = "No work is available yet :cry:
 I'll reply in this thread once I find some work for you!";
@@ -228,6 +229,8 @@ impl<T: Client> Manager<T> {
         let mut messages: Vec<String> = vec![];
 
         for file in files {
+            trace!("file: {file:?}");
+
             if file.name.contains("film") {
                 info!("downloading films csv into db");
                 let v: Vec<Film> = csv_parser::from_url::<FilmInput>(&file.url_private_download)
