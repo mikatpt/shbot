@@ -229,6 +229,7 @@ impl<T: Client> Manager<T> {
 
         for file in files {
             if file.name.contains("film") {
+                info!("downloading films csv into db");
                 let v: Vec<Film> = csv_parser::from_url::<FilmInput>(&file.url_private_download)
                     .await?
                     .into_iter()
@@ -237,6 +238,7 @@ impl<T: Client> Manager<T> {
 
                 messages.push(self.insert_films(v).await);
             } else if file.name.contains("student") {
+                info!("downloading students csv into db");
                 let v: Vec<Student> =
                     csv_parser::from_url::<StudentInput>(&file.url_private_download)
                         .await?
