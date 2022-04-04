@@ -9,6 +9,8 @@ async fn main() -> Result<()> {
 
     logger::install(None);
     debug!("Loaded environment variables");
+    let s = std::env::var("POSTGRES_HOST")?;
+    debug!("{s}");
 
     let cfg = config::new()?;
 

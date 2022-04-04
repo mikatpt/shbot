@@ -1,7 +1,11 @@
+version: '3.4'
 services:
   api:
     image: shbot_api
     container_name: shbot_api
-    build: .
+    build:
+      context: .
+      args:
+        - "SHBOT_ENV_FILE=.env"
     ports:
       - "7070:7070"

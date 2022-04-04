@@ -23,7 +23,7 @@ deadpool-postgres = { version = "0.10.0", features = ["serde"] }
 dotenv = "0.15"
 futures = "0.3"
 itertools = "0.10.3"
-reqwest = { version = "0.11.10", features = ["json"] }
+reqwest = { version = "0.11.10", features = ["json","rustls-tls"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1.0"
 strum = { version = "0.24", features = ["derive"] }

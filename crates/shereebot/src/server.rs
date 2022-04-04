@@ -33,11 +33,16 @@ pub(crate) struct InnerState<T: Client> {
 
 impl InnerState<MockClient> {
     pub(crate) fn _new() -> State<MockClient> {
+        let v = reqwest::tls::Version::TLS_1_2;
+        let req_client = reqwest::Client::builder()
+            .min_tls_version(v)
+            .build()
+            .unwrap_or_default();
         Arc::new(Self {
             db: Database::<MockClient>::new(),
             oauth_token: "".to_string(),
             queue: Queue::_new(),
-            req_client: reqwest::Client::new(),
+            req_client,
         })
     }
 }
@@ -51,7 +56,8 @@ impl<T: Client> std::fmt::Debug for InnerState<T> {
 async fn initialize_state(cfg: &Config) -> color_eyre::Result<State<PostgresClient>> {
     let db = crate::store::Database::<PostgresClient>::new(&cfg.postgres)?;
     let oauth_token = cfg.token.to_string();
-    let req_client = reqwest::Client::builder().build()?;
+    let v = reqwest::tls::Version::TLS_1_2;
+    let req_client = reqwest::Client::builder().min_tls_version(v).build()?;
     let queue = Queue::from_db(db.clone()).await?;
 
     let state = InnerState {

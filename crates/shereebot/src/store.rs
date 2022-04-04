@@ -7,7 +7,7 @@ use tokio_postgres::NoTls;
 use uuid::Uuid;
 
 use crate::{queue::QueueItem, Result};
-use models::{Film, Priority, Student};
+use models::{Film, Priority, Role, Student};
 
 pub mod postgres;
 pub use postgres::PostgresClient;
@@ -32,14 +32,15 @@ pub trait Client: Send + Sync + 'static {
     async fn insert_film(&self, name: &str, group_number: i32, priority: Priority) -> Result<Film>;
     async fn update_film(&self, film: &Film) -> Result<()>;
 
-    async fn get_student_films(&self, student_id: &Uuid) -> Result<HashSet<Film>>;
+    async fn get_worked_films(&self, student_id: &Uuid) -> Result<HashSet<Film>>;
     async fn insert_student_films(&self, s_id: &Uuid, f_id: &Uuid) -> Result<()>;
+    async fn get_films_exclusionary(&self, group: i32, role: Role) -> Result<Vec<Film>>;
 
     async fn list_students(&self) -> Result<Vec<Student>>;
     async fn get_student(&self, slack_id: &str) -> Result<Student>;
     async fn insert_student_from_csv(&self, name: &str, group: i32, class: &str)
         -> Result<Student>;
-    async fn insert_student(&self, slack_id: &str) -> Result<Student>;
+    async fn insert_student(&self, slack_id: &str, name: &str) -> Result<Student>;
     async fn update_student(&self, student: &Student) -> Result<()>;
 
     async fn get_queue(&self, wait: bool) -> Result<Vec<QueueItem>>;
@@ -86,13 +87,18 @@ impl<T: Client> Database<T> {
     // ------------- Junction ------------- //
 
     /// Retrieves all films a student has worked on.
-    pub async fn get_student_films(&self, student_id: &Uuid) -> Result<HashSet<Film>> {
-        self.client.get_student_films(student_id).await
+    pub async fn get_worked_films(&self, student_id: &Uuid) -> Result<HashSet<Film>> {
+        self.client.get_worked_films(student_id).await
     }
 
     /// Inserts a shared student_film marker.
     pub async fn insert_student_films(&self, student_id: &Uuid, film_id: &Uuid) -> Result<()> {
         self.client.insert_student_films(student_id, film_id).await
+    }
+
+    /// Gets all films where given role is available AND student is not in its group.
+    pub async fn get_films_exclusionary(&self, group: i32, role: Role) -> Result<Vec<Film>> {
+        self.client.get_films_exclusionary(group, role).await
     }
 
     // ------------- Students ------------- //
@@ -115,8 +121,8 @@ impl<T: Client> Database<T> {
     }
 
     /// Insert a student. This should ONLY be called if the student isn't in the database.
-    pub async fn insert_student(&self, slack_id: &str) -> Result<Student> {
-        self.client.insert_student(slack_id).await
+    pub async fn insert_student(&self, slack_id: &str, name: &str) -> Result<Student> {
+        self.client.insert_student(slack_id, name).await
     }
 
     /// Updates a students information.

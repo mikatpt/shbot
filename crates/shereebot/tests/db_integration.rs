@@ -82,10 +82,7 @@ async fn students() -> Result<()> {
 
     // this hits slack api, if it fails say why.
     let id = "U038V25S1MJ";
-    let mut student = match db.insert_student(id).await {
-        Ok(s) => s,
-        Err(_) => panic!("couldn't hit slack api for some reason"),
-    };
+    let mut student = db.insert_student(id, "a").await?;
 
     student.roles.ae = Some("star wars".to_string());
 

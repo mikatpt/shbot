@@ -19,6 +19,7 @@ pub(crate) struct Queue<T: Client> {
     pub jobs_q: Q,
     pub wait_q: Q,
     db: Database<T>,
+    client: reqwest::Client,
 }
 
 type Q = Arc<Mutex<BinaryHeap<QueueItem>>>;
@@ -62,10 +63,16 @@ impl Ord for QueueItem {
 
 impl Queue<MockClient> {
     pub fn _new() -> Self {
+        let v = reqwest::tls::Version::TLS_1_2;
+        let client = reqwest::Client::builder()
+            .min_tls_version(v)
+            .build()
+            .unwrap_or_default();
         Self {
             jobs_q: Arc::new(Mutex::new(BinaryHeap::new())),
             wait_q: Arc::new(Mutex::new(BinaryHeap::new())),
             db: Database::<MockClient>::new(),
+            client,
         }
     }
 }
@@ -74,10 +81,16 @@ impl<T: Client> Queue<T> {
     pub(crate) async fn from_db(db: Database<T>) -> Result<Self> {
         let wait_q = db.get_queue(true).await?.into_iter().collect();
         let film_q = db.get_queue(false).await?.into_iter().collect();
+        let v = reqwest::tls::Version::TLS_1_2;
+        let client = reqwest::Client::builder()
+            .min_tls_version(v)
+            .build()
+            .unwrap_or_default();
         Ok(Self {
             jobs_q: Arc::new(Mutex::new(film_q)),
             wait_q: Arc::new(Mutex::new(wait_q)),
             db,
+            client,
         })
     }
 
@@ -137,53 +150,36 @@ impl<T: Client> Queue<T> {
         channel: &str,
     ) -> Result<Option<QueueItem>> {
         let mut student = self.db.get_student(slack_id).await?;
+        let group = student.group_number;
+        let role = student.current_role;
 
-        if student.current_role == Role::Done {
+        if role == Role::Done {
             let e = "You're done! No more work to do :)";
             return Err(Error::Duplicate(e.into()));
         }
 
         info!("Trying to assign job: now retrieving all films student has worked!");
-        // NOTE: We need to add some more logic here.
-        //
-        // A student should not work the same job twice, unless this is not possible.
-        //
-        // first, last = slack.get_first_last(slack_id);
-        //
-        // group = db.get_group(first,last)
-        //
-        // override_unique = db.unique_films_remain(role, group, student_id)
-        //
-        //  I did pre for [a, b, c]
-        //  I did ae for [d]
-        //  I want to not be editor for any of the above.
-        //  If there are films I did NOT do pre for that have editor avail,
-        //  and I have NOT done post for those films, we're all good.
-        //
-        //  Films I didn't do pre for:
-        //  SELECT * FROM films where group != 1 AND editor == null
-        //
-        //  Films I did post for:
-        //  SELECT * FROM films
-        //      JOIN roles on roles.id = films.roles_id
-        //      JOIN students_films ON films.id = students_films.film_id
-        //      WHERE students_films.student_id = student_id;
-        //
-        //  If pre.len > 0 and pre.has(films not in post), not unique.
-        //
-        // track films for each category?
-        let override_unique = false;
 
-        let student_films = self.db.get_student_films(&student.id).await?;
-        let worked_films: HashSet<_> = student_films.iter().map(|f| f.name.clone()).collect();
+        // A student should not work the same job twice, unless this is not possible.
+        let eligible = self.db.get_films_exclusionary(group, role).await?;
+        let eligible: HashSet<_> = eligible.iter().map(|f| f.name.clone()).collect();
+        let worked_films = self.db.get_worked_films(&student.id).await?;
+        let worked_films: HashSet<_> = worked_films.iter().map(|f| f.name.clone()).collect();
+
+        let mut eligible_films_exist = false;
+        for film in &eligible {
+            // If student has not worked an eligible film, unique films still exist.
+            if !worked_films.contains(film) {
+                eligible_films_exist = true;
+                break;
+            }
+        }
 
         // NOTE:  don't increment until they deliver!
         let role = student.current_role;
 
         info!("Searching for eligible jobs...");
-        let job_to_do = self
-            .get_job(worked_films, slack_id, role, override_unique)
-            .await;
+        let job_to_do = self.get_job(worked_films, role, eligible_films_exist).await;
 
         // If there was no suitable job found, insert student into the wait queue
         if job_to_do.is_none() {
@@ -215,9 +211,8 @@ impl<T: Client> Queue<T> {
     async fn get_job(
         &self,
         worked_films: HashSet<String>,
-        slack_id: &str,
         role: Role,
-        override_unique: bool,
+        eligible_films_exist: bool,
     ) -> Option<QueueItem> {
         let mut work_q = self.jobs_q.lock().await;
         let mut recycle = vec![];
@@ -226,14 +221,14 @@ impl<T: Client> Queue<T> {
 
         // Search queue for a job to work on, recycle entries that don't fit.
         while let Some(job) = work_q.pop() {
-            // I think this is redundant but we'll stay safe for now.
-            let same_id = job.student_slack_id == slack_id;
             let worked_on_film = worked_films.contains(&job.film_name);
 
-            let worked_on = same_id || worked_on_film;
             let eligible = job.role == role;
 
-            if eligible && (override_unique || !worked_on) {
+            // Only assign if role is correct.
+            // Then, only assign if student hasn't worked on the film before,
+            // BUT assign anyways if there are no unique films left.
+            if eligible && (!worked_on_film || !eligible_films_exist) {
                 eligible_job = Some(job);
                 break;
             } else {

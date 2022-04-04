@@ -9,7 +9,7 @@ edition = "2021"
 color-eyre = "0.5"
 csv = "1.1"
 models = { path = "../models" }
-reqwest = { version = "0.11.10", features = ["json"] }
+reqwest = { version = "0.11.10", features = ["json","rustls-tls"] }
 serde = { version = "1", features = ["derive"] }
 tokio = { version = "1.17.0", features = ["full"] }
 

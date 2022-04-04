@@ -1,26 +1,43 @@
 # syntax=docker/dockerfile:1
-FROM rust:1.59.0
 
-###### Caching build dependencies
-# https://blog.mgattozzi.dev/caching-rust-docker-builds/
+## https://www.lpalmieri.com/posts/fast-rust-docker-builds/
 
-COPY _dummy.rs ./
+# 1. Using cargo-chef, compute the recipe needed to build dependencies.
 
-COPY Cargo.lock ./
-COPY Cargo.toml ./
+FROM rust:1.59.0 AS chef
+RUN cargo install cargo-chef
 
-RUN sed -i 's/src\/main.rs/_dummy.rs/' Cargo.toml
+WORKDIR shbot
 
-RUN cargo build --release
+FROM chef AS planner
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
 
-RUN sed -i 's/_dummy.rs/src\/main.rs/' Cargo.toml
+# 2. Build dependencies
 
-######
+FROM chef AS builder 
 
-COPY ./src ./src
+COPY --from=planner /shbot/recipe.json recipe.json
 
-# Production env variables
-COPY ./.env.prod ./.env
+# Build dependencies - this is the caching Docker layer!
+RUN cargo chef cook --release --recipe-path recipe.json
 
-RUN cargo build --release
-CMD ["./target/release/shbot"]
+# 3. Build application
+
+COPY . .
+
+RUN cargo build --release --bin shbot
+
+# 3. Run app in a default ubuntu container. We don't need rust, since we just
+#    copy the binary over from `builder`
+
+FROM ubuntu:latest AS runtime
+RUN apt-get update && apt-get install -y libssl-dev
+WORKDIR shbot
+
+## Prod env variables
+ARG SHBOT_ENV_FILE
+
+COPY ${SHBOT_ENV_FILE} .env
+COPY --from=builder /shbot/target/release/shbot /usr/local/bin
+ENTRYPOINT ["/usr/local/bin/shbot"]

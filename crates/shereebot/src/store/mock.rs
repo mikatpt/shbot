@@ -11,7 +11,7 @@ use crate::{
     store::{Client, Database},
     Error, Result,
 };
-use models::{Film, Priority, Student};
+use models::{Film, Priority, Role, Student};
 
 #[derive(Debug)]
 pub struct MockClient {
@@ -66,11 +66,14 @@ impl Client for MockClient {
 
     // ------------- Junction ------------- //
 
-    async fn get_student_films(&self, student_id: &Uuid) -> Result<HashSet<Film>> {
+    async fn get_worked_films(&self, student_id: &Uuid) -> Result<HashSet<Film>> {
         Err(Error::Internal(eyre!("sample error")))
     }
 
     async fn insert_student_films(&self, s_id: &Uuid, f_id: &Uuid) -> Result<()> {
+        Err(Error::Internal(eyre!("sample error")))
+    }
+    async fn get_films_exclusionary(&self, group: i32, role: Role) -> Result<Vec<Film>> {
         Err(Error::Internal(eyre!("sample error")))
     }
 
@@ -89,7 +92,7 @@ impl Client for MockClient {
         -> Result<Student> {
         Err(Error::Internal(eyre!("sample error")))
     }
-    async fn insert_student(&self, slack_id: &str) -> Result<Student> {
+    async fn insert_student(&self, slack_id: &str, name: &str) -> Result<Student> {
         Err(Error::Internal(eyre!("sample error")))
     }
 

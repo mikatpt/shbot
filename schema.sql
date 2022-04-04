@@ -1,4 +1,5 @@
 ---- Schema ----
+DROP DATABASE shereebot;
 CREATE DATABASE shereebot;
 
 \c shereebot;

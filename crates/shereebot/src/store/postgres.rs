@@ -129,7 +129,7 @@ impl Client for PostgresClient {
 
     // ------------- Junction ------------- //
 
-    async fn get_student_films(&self, student_id: &Uuid) -> Result<HashSet<Film>> {
+    async fn get_worked_films(&self, student_id: &Uuid) -> Result<HashSet<Film>> {
         let client = self.pool.get().await?;
 
         let stmt = "
@@ -159,6 +159,26 @@ impl Client for PostgresClient {
         info!("Inserted into students_films");
 
         Ok(())
+    }
+
+    async fn get_films_exclusionary(&self, group: i32, role: Role) -> Result<Vec<Film>> {
+        let client = self.pool.get().await?;
+
+        let role = role.as_ref().to_lowercase();
+
+        let stmt = format!(
+            "
+            SELECT DISTINCT f.name, f.priority, f.group_number, 
+                   r.ae, r.editor, r.sound, r.finish, r.current
+            FROM films as f, roles as r 
+            WHERE f.group_number != $1 AND r.{role} IS NULL;"
+        );
+        let stmt = client.prepare_cached(&stmt).await?;
+
+        let rows = client.query(&stmt, &[&group]).await?;
+        let films: Result<Vec<_>> = rows.into_iter().map(format_row_into_film).collect();
+        let films = films?;
+        Ok(films)
     }
 
     // ------------- Students ------------- //
@@ -195,9 +215,37 @@ impl Client for PostgresClient {
         let stmt = client.prepare_cached(stmt).await?;
 
         let mut rows = client.query(&stmt, &[&slack_id]).await?;
+        // TODO: clean up this garbage
         if rows.is_empty() {
-            warn!("No user for id {slack_id}. Inserting instead.");
-            return self.insert_student(slack_id).await;
+            warn!("No user for id {slack_id}. Looking user up instead.");
+            let version = reqwest::tls::Version::TLS_1_2;
+            let req_client = reqwest::Client::builder()
+                .min_tls_version(version)
+                .build()?;
+            let token = std::env::var("OAUTH_TOKEN").map_err(Into::<Error>::into)?;
+            let req = format!("https://slack.com/api/users.info?user={slack_id}");
+
+            let res = req_client.post(req).bearer_auth(token).send().await?;
+            let res = res.json::<UserResponse>().await?;
+            let name = res.user.real_name;
+            let stmt = "
+                SELECT s.id, s.name, s.slack_id, s.current_film, 
+                       s.group_number, s.class, r.ae, r.editor,
+                       r.sound, r.finish, r.current
+                FROM students as s, roles as r 
+                WHERE s.name = $1
+                AND s.roles_id = r.id;";
+            let stmt = client.prepare_cached(stmt).await?;
+            let mut rows = client.query(&stmt, &[&name]).await?;
+
+            if rows.is_empty() {
+                return self.insert_student(slack_id, &name).await;
+            }
+
+            let row = rows.pop().expect("just checked empty");
+            let student = format_row_into_student(row)?;
+            info!("Retrieved student {}", student.name);
+            return Ok(student);
         }
         let row = rows.pop().expect("^^just checked if empty");
 
@@ -248,18 +296,7 @@ impl Client for PostgresClient {
         Ok(student)
     }
 
-    // TODO: convert this to ONLY update slack id.
-    async fn insert_student(&self, slack_id: &str) -> Result<Student> {
-        // Get student name from slack api
-        let client = reqwest::Client::builder().build()?;
-        let token = std::env::var("OAUTH_TOKEN").map_err(Into::<Error>::into)?;
-        let req = format!("https://slack.com/api/users.info?user={slack_id}");
-
-        let res = client.post(req).bearer_auth(token).send().await?;
-        let res = res.json::<UserResponse>().await?;
-
-        let name = res.user.real_name;
-
+    async fn insert_student(&self, slack_id: &str, name: &str) -> Result<Student> {
         // Insert student
         let mut client = self.pool.get().await?;
 
@@ -289,7 +326,7 @@ impl Client for PostgresClient {
 
         info!("Inserted student: {}", name);
         student.slack_id = slack_id.to_string();
-        student.name = name;
+        student.name = name.to_string();
 
         Ok(student)
     }
@@ -304,7 +341,7 @@ impl Client for PostgresClient {
                 SELECT roles_id FROM students WHERE id = $1);";
         let stmt = client.prepare_cached(stmt).await?;
 
-        let stmt2 = "UPDATE students SET current_film = $2 WHERE id = $1";
+        let stmt2 = "UPDATE students SET current_film = $2, slack_id = $3 WHERE id = $1";
         let stmt2 = client.prepare_cached(stmt2).await?;
 
         let transaction = client.transaction().await?;
@@ -319,9 +356,8 @@ impl Client for PostgresClient {
             &student.current_role.as_ref(),
         ]).await?;
 
-        transaction
-            .query(&stmt2, &[&student.id, &student.current_film])
-            .await?;
+        let (id, film, slack_id) = (&student.id, &student.current_film, &student.slack_id);
+        transaction.query(&stmt2, &[&id, &film, &slack_id]).await?;
 
         transaction.commit().await?;
 

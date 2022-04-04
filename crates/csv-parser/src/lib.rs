@@ -5,6 +5,7 @@ use std::collections::HashMap;
 mod convertors;
 mod structs;
 
+use reqwest::tls::Version;
 pub use structs::{FilmInput, FilmOutput, StudentInput, StudentOutput};
 
 /// Read from a url into csv. This will error out if deserialization fails!
@@ -44,8 +45,11 @@ pub async fn to_slack(csv: String, title: &str, msg: &str, channel: &str) -> Res
     params.insert("content", &csv);
     params.insert("channels", channel);
     params.insert("initial_comment", msg);
+    let version = Version::TLS_1_2;
 
-    let client = reqwest::Client::builder().build()?;
+    let client = reqwest::Client::builder()
+        .min_tls_version(version)
+        .build()?;
     client
         .post(url)
         .bearer_auth(token)
@@ -94,7 +98,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "Hits slack"]
+    // #[ignore = "Hits slack"]
     async fn test_slack() -> Result<()> {
         dotenv::dotenv().ok();
         let s = StudentOutput {

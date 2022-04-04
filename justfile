@@ -5,6 +5,9 @@ set export
 watch:
     cargo watch -x run
 
+up:
+    docker-compose --project-name shbot_project up
+
 down:
     cd cloud && terraform apply -var 'enable_green=false' -var 'enable_blue=false'
 
