@@ -97,7 +97,7 @@ impl<T: Client> AppMention<T> {
             .nth(1)
             .ok_or_else(|| Error::InvalidArg(CMD_ERR.into()))?;
 
-        Ok(Command::from_str(cmd)?)
+        Ok(Command::from_str(&cmd.to_uppercase())?)
     }
 
     async fn run_command(&self, cmd: Command) -> Result<String> {
@@ -114,7 +114,7 @@ impl<T: Client> AppMention<T> {
                 let (group, films) = rest
                     .split_once(' ')
                     .ok_or_else(|| Error::InvalidArg(CMD_ERR.into()))?;
-                let priority = Priority::from_str(priority)?;
+                let priority = Priority::from_str(&priority.to_uppercase())?;
                 let group = group.parse::<i32>().unwrap_or_default();
 
                 let films: Vec<Film> = films

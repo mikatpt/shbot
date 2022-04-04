@@ -46,6 +46,7 @@ pub enum EventType {
 #[serde(rename_all = "snake_case")]
 pub enum ChannelType {
     AppHome,
+    Im,
 }
 
 #[derive(Debug, Clone, AsRefStr, Deserialize, Serialize)]
