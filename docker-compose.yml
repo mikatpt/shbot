@@ -1,11 +1,25 @@
-version: '3.4'
+version: '3.8'
 services:
-  api:
-    image: shbot_api
-    container_name: shbot_api
-    build:
-      context: .
-      args:
-        - "SHBOT_ENV_FILE=.env"
-    ports:
-      - "7070:7070"
+  postgres:
+    image: postgres:14.2
+    restart: always
+    container_name: postgres
+    ports: 
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: local
+      POSTGRES_DB: shereebot
+      POSTGRES_PASSWORD: local
+    volumes:
+      - db:/var/lib/postgresql/data
+volumes:
+  db:
+  # api:
+  #   image: shbot_api
+  #   container_name: shbot_api
+  #   build:
+  #     context: .
+  #     args:
+  #       - "SHBOT_ENV_FILE=.env"
+  #   ports:
+  #     - "7070:7070"

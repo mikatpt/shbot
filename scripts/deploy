@@ -36,7 +36,7 @@ source .env
 sed -i "s/POSTGRES_HOST.*/POSTGRES_HOST=${DB_IP}/" ./.env.prod
 
 _info "Building docker image"
-docker-compose build --build-arg SHBOT_ENV_FILE=.env.prod
+docker build -t shbot_api --build-arg SHBOT_ENV_FILE=.env.prod
 
 _info "Cleaning up old images"
 docker image prune -f

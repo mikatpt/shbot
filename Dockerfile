@@ -31,7 +31,7 @@ RUN cargo build --release --bin shbot
 # 3. Run app in a default ubuntu container. We don't need rust, since we just
 #    copy the binary over from `builder`
 
-FROM rust:1.59.0 AS runtime
+FROM ubuntu:latest AS runtime
 RUN apt-get update && apt-get install -y libssl-dev
 WORKDIR shbot
 
