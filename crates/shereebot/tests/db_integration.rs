@@ -1,5 +1,7 @@
+use std::{env, process::Command, sync::Once};
+
 use chrono::Utc;
-use color_eyre::Result;
+use color_eyre::{Help, Result};
 use deadpool_postgres::Runtime::Tokio1;
 use models::{Priority, Role};
 use serial_test::serial;
@@ -8,26 +10,18 @@ use shbot::{
     queue::QueueItem,
     store::{Database, PostgresClient},
 };
-use std::{env, sync::Once};
 use tokio::test;
+use tracing::info;
 
 static INIT: Once = Once::new();
-
-/*
-Initial setup:
-sudo -u postgres psql
-CREATE ROLE test WITH PASSWORD 'test';
-CREATE DATABASE test_shereebot;
-GRANT ALL ON DATABASE test_shereebot TO test;
-*/
 
 fn pg_conf() -> deadpool_postgres::Config {
     deadpool_postgres::Config {
         user: Some("test".to_string()),
         password: Some("test".to_string()),
-        host: Some("localhost".to_string()),
-        port: Some(5432),
-        dbname: Some("test_shereebot".to_string()),
+        host: Some("0".to_string()),
+        port: Some(5435),
+        dbname: Some("shereebot".to_string()),
         ..Default::default()
     }
 }
@@ -36,14 +30,34 @@ async fn setup() -> Result<Database<PostgresClient>> {
     INIT.call_once(|| {
         env::set_var("ENVIRONMENT", "test");
         // set to trace to debug things
-        env::set_var("RUST_LOG", "shbot=error,tower=trace,tower_http=trace");
+        env::set_var("RUST_LOG", "shbot=info,tower=trace,tower_http=trace");
+
+        let file = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/test.docker-compose.yml");
+
+        // Start the docker test container.
+        let output = Command::new("docker")
+            .args(["compose", "-f", file, "up", "-d"])
+            .output()
+            .expect("Failed to run command");
+
+        if !output.status.success() {
+            panic!("failed to spin up docker container");
+        }
 
         dotenv::dotenv().ok();
         logger::install(None);
     });
+    info!("Started up docker!");
     let pool = pg_conf().create_pool(Some(Tokio1), tokio_postgres::NoTls)?;
 
-    let client = pool.get().await?;
+    let client = match pool.get().await {
+        Ok(c) => c,
+        Err(e) => {
+            return Err(e)
+                .with_warning(|| "Docker didn't start fast enough.")
+                .with_suggestion(|| "Try running `cargo test` again.");
+        }
+    };
 
     let statement = include_str!("./test_schema.sql");
     client.batch_execute(statement).await?;
@@ -76,7 +90,7 @@ async fn films() -> Result<()> {
     Ok(())
 }
 
-#[test]
+#[tokio::test]
 #[serial]
 async fn students() -> Result<()> {
     let db = setup().await?;

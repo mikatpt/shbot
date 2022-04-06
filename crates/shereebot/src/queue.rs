@@ -19,7 +19,6 @@ pub(crate) struct Queue<T: Client> {
     pub jobs_q: Q,
     pub wait_q: Q,
     db: Database<T>,
-    client: reqwest::Client,
 }
 
 type Q = Arc<Mutex<BinaryHeap<QueueItem>>>;
@@ -63,16 +62,10 @@ impl Ord for QueueItem {
 
 impl Queue<MockClient> {
     pub fn _new() -> Self {
-        let v = reqwest::tls::Version::TLS_1_2;
-        let client = reqwest::Client::builder()
-            .min_tls_version(v)
-            .build()
-            .unwrap_or_default();
         Self {
             jobs_q: Arc::new(Mutex::new(BinaryHeap::new())),
             wait_q: Arc::new(Mutex::new(BinaryHeap::new())),
             db: Database::<MockClient>::new(),
-            client,
         }
     }
 }
@@ -81,16 +74,10 @@ impl<T: Client> Queue<T> {
     pub(crate) async fn from_db(db: Database<T>) -> Result<Self> {
         let wait_q = db.get_queue(true).await?.into_iter().collect();
         let film_q = db.get_queue(false).await?.into_iter().collect();
-        let v = reqwest::tls::Version::TLS_1_2;
-        let client = reqwest::Client::builder()
-            .min_tls_version(v)
-            .build()
-            .unwrap_or_default();
         Ok(Self {
             jobs_q: Arc::new(Mutex::new(film_q)),
             wait_q: Arc::new(Mutex::new(wait_q)),
             db,
-            client,
         })
     }
 
