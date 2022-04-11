@@ -30,7 +30,7 @@ async fn setup() -> Result<Database<PostgresClient>> {
     INIT.call_once(|| {
         env::set_var("ENVIRONMENT", "test");
         // set to trace to debug things
-        env::set_var("RUST_LOG", "shbot=info,tower=trace,tower_http=trace");
+        env::set_var("RUST_LOG", "error");
 
         let file = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/test.docker-compose.yml");
 
@@ -46,8 +46,8 @@ async fn setup() -> Result<Database<PostgresClient>> {
 
         dotenv::dotenv().ok();
         logger::install(None);
+        info!("Started up docker!");
     });
-    info!("Started up docker!");
     let pool = pg_conf().create_pool(Some(Tokio1), tokio_postgres::NoTls)?;
 
     let client = match pool.get().await {

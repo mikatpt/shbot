@@ -19,6 +19,7 @@ pub struct Server {
 pub fn new() -> Result<Config> {
     let port = env::var("SERVER_PORT")?;
     let address = SocketAddr::from(([0, 0, 0, 0], port.parse()?));
+    let pg_port = env::var("POSTGRES_PORT")?.parse::<u16>()?;
 
     let server = Server { port, address };
     let postgres = deadpool_postgres::Config {
@@ -26,6 +27,7 @@ pub fn new() -> Result<Config> {
         host: env::var("POSTGRES_HOST").ok(),
         password: env::var("POSTGRES_PASSWORD").ok(),
         dbname: env::var("POSTGRES_DBNAME").ok(),
+        port: Some(pg_port),
         ..Default::default()
     };
     let token = env::var("OAUTH_TOKEN")?;
