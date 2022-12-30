@@ -10,13 +10,12 @@ use crate::{
     queue::QueueItem,
     server::State,
     slack::{app_mentions::Response, events::File},
-    store::Client,
     Error, Result,
 };
 use models::{Film, Priority, Student};
 
-pub(crate) struct Manager<T: Client> {
-    state: State<T>,
+pub(crate) struct Manager {
+    state: State,
 }
 
 const DELIVER: &str = "Good job!! You've delivered your work.
@@ -33,8 +32,8 @@ const INTERNAL_ERR: &str = "Something went wrong internally - please let Sheree 
 const NO_WORK: &str = "No work is available yet :cry:
 I'll reply in this thread once I find some work for you!";
 
-impl<T: Client> Manager<T> {
-    pub(crate) fn new(state: State<T>) -> Self {
+impl Manager {
+    pub(crate) fn new(state: State) -> Self {
         Self { state }
     }
 
@@ -257,8 +256,8 @@ impl<T: Client> Manager<T> {
     }
 }
 
-async fn insert_film<T: Client>(
-    state: State<T>,
+async fn insert_film(
+    state: State,
     film_name: &str,
     group: i32,
     priority: Priority,

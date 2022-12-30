@@ -7,18 +7,14 @@ use futures::lock::Mutex;
 use tracing::info;
 use uuid::Uuid;
 
-use crate::store::mock::MockClient;
-use crate::{
-    store::{Client, Database},
-    Error, Result,
-};
+use crate::{store::Database, Error, Result};
 use models::{Film, Priority, Role, Student};
 
 #[derive(Debug)]
-pub(crate) struct Queue<T: Client> {
+pub(crate) struct Queue {
     pub jobs_q: Q,
     pub wait_q: Q,
-    db: Database<T>,
+    db: Database,
 }
 
 type Q = Arc<Mutex<BinaryHeap<QueueItem>>>;
@@ -60,18 +56,18 @@ impl Ord for QueueItem {
     }
 }
 
-impl Queue<MockClient> {
+impl Queue {
     pub fn _new() -> Self {
         Self {
             jobs_q: Arc::new(Mutex::new(BinaryHeap::new())),
             wait_q: Arc::new(Mutex::new(BinaryHeap::new())),
-            db: Database::<MockClient>::new(),
+            db: crate::store::new_mock(),
         }
     }
 }
 
-impl<T: Client> Queue<T> {
-    pub(crate) async fn from_db(db: Database<T>) -> Result<Self> {
+impl Queue {
+    pub(crate) async fn from_db(db: Database) -> Result<Self> {
         let wait_q = db.get_queue(true).await?.into_iter().collect();
         let film_q = db.get_queue(false).await?.into_iter().collect();
         Ok(Self {

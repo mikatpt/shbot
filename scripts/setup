@@ -8,7 +8,9 @@ DB_USER_PASS=${3:-testing}
 
 sudo su postgres <<EOF
 createdb $DB_NAME
-psql -c "CREATE USER $DB_USER WITH PASSWORD '$DB_USER_PASS';"
-psql -c "GRANT ALL PRIVILEGES on DATABASE $DB_NAME to $DB_USER;"
+psql -h localhost -p 5432 -c "CREATE USER $DB_USER WITH PASSWORD '$DB_USER_PASS';"
+psql -h localhost -p 5432 -c "GRANT ALL PRIVILEGES on DATABASE $DB_NAME to $DB_USER;"
+psql -h localhost -p 5432 $DB_NAME -c "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO $DB_USER;"
+psql -h localhost -p 5432 $DB_NAME -c "GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO $DB_USER;"
 
 EOF

@@ -8,38 +8,33 @@ use axum::{
 };
 use tracing::info;
 
-use crate::{
-    config::Config,
-    queue::Queue,
-    store::{mock::MockClient, Client, Database, PostgresClient},
-    UserError,
-};
+use crate::{config::Config, queue::Queue, store::Database, UserError};
 mod handlers;
 mod interceptors;
 
 /// Contains all server-wide stateful data.
-pub(crate) type State<T> = Arc<InnerState<T>>;
+pub(crate) type State = Arc<InnerState>;
 
 /// All server results must return a UserError.
 /// This allows us to report readable errors and hide internal errors.
 pub type Result<T> = std::result::Result<T, UserError>;
 
-pub(crate) struct InnerState<T: Client> {
-    pub(crate) db: Database<T>,
+pub(crate) struct InnerState {
+    pub(crate) db: Database,
     pub(crate) oauth_token: String,
     pub(crate) req_client: reqwest::Client,
-    pub(crate) queue: Queue<T>,
+    pub(crate) queue: Queue,
 }
 
-impl InnerState<MockClient> {
-    pub(crate) fn _new() -> State<MockClient> {
+impl InnerState {
+    pub(crate) fn _new() -> State {
         let v = reqwest::tls::Version::TLS_1_2;
         let req_client = reqwest::Client::builder()
             .min_tls_version(v)
             .build()
             .unwrap_or_default();
         Arc::new(Self {
-            db: Database::<MockClient>::new(),
+            db: crate::store::new_mock(),
             oauth_token: "".to_string(),
             queue: Queue::_new(),
             req_client,
@@ -47,17 +42,20 @@ impl InnerState<MockClient> {
     }
 }
 
-impl<T: Client> std::fmt::Debug for InnerState<T> {
+impl std::fmt::Debug for InnerState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("<State>").finish()
     }
 }
 
-async fn initialize_state(cfg: &Config) -> color_eyre::Result<State<PostgresClient>> {
-    let db = crate::store::Database::<PostgresClient>::new(&cfg.postgres)?;
+async fn initialize_state(cfg: &Config) -> color_eyre::Result<State> {
+    let db = crate::store::new(&cfg.postgres)?;
     let oauth_token = cfg.token.to_string();
     let v = reqwest::tls::Version::TLS_1_2;
-    let req_client = reqwest::Client::builder().min_tls_version(v).build()?;
+    let req_client = reqwest::Client::builder()
+        .use_rustls_tls()
+        .min_tls_version(v)
+        .build()?;
     let queue = Queue::from_db(db.clone()).await?;
 
     let state = InnerState {
@@ -86,17 +84,17 @@ pub async fn serve(cfg: &Config) -> color_eyre::Result<()> {
 }
 
 /// Initialize axum app and attach all routes.
-fn new_router<T: Client>(state: State<T>) -> Router {
+fn new_router(state: State) -> Router {
     let app = Router::new()
         .route("/", get(handlers::home))
         .route(
             "/films",
-            get(handlers::list_films::<T>),
+            get(handlers::list_films),
             // .post(handlers::insert_films::<T>),
         )
-        .route("/events", post(handlers::events_api_entrypoint::<T>))
+        .route("/events", post(handlers::events_api_entrypoint))
         .route("/_health", get(health_check))
-        .route("/testing", post(handlers::testing::<T>))
+        .route("/testing", post(handlers::testing))
         .layer(Extension(state));
 
     interceptors::attach(app)

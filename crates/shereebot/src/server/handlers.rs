@@ -6,13 +6,12 @@ use crate::{
     server::{Result, State},
     slack::events::EventRequest,
     slack::slash::{ResponseType, SlashResponse},
-    store::Client,
     Error,
 };
 use models::Film;
 
 /// Just for testing poorly documented slack endpoints.
-pub(super) async fn testing<T: Client>(body: Bytes) -> Result<Json<SlashResponse>> {
+pub(super) async fn testing(body: Bytes) -> Result<Json<SlashResponse>> {
     debug!("{:?}", body);
 
     // Do some processing
@@ -28,9 +27,9 @@ pub(super) async fn home() -> Html<&'static str> {
 
 // --------------- Events API --------------- //
 
-pub(super) async fn events_api_entrypoint<T: Client>(
+pub(super) async fn events_api_entrypoint(
     Json(request): Json<Value>,
-    Extension(state): Extension<State<T>>,
+    Extension(state): Extension<State>,
 ) -> Result<(StatusCode, String)> {
     if let Some(challenge) = request.get("challenge") {
         info!("Auth challenge received");
@@ -56,9 +55,7 @@ pub(super) async fn events_api_entrypoint<T: Client>(
 // --------------- Films Handlers --------------- //
 
 #[tracing::instrument]
-pub(super) async fn list_films<T: Client>(
-    Extension(state): Extension<State<T>>,
-) -> Result<Json<Vec<Film>>> {
+pub(super) async fn list_films(Extension(state): Extension<State>) -> Result<Json<Vec<Film>>> {
     info!("Retrieving films...");
 
     match state.db.list_films().await {

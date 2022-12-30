@@ -13,23 +13,9 @@ use crate::{
 };
 use models::{Film, Priority, Role, Student};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MockClient {
     pub success: bool,
-}
-
-impl Database<MockClient> {
-    pub fn new() -> Self {
-        Default::default()
-    }
-}
-
-impl Default for Database<MockClient> {
-    fn default() -> Self {
-        Self {
-            client: MockClient { success: true },
-        }
-    }
 }
 
 #[async_trait]
@@ -115,12 +101,6 @@ impl Client for MockClient {
 
     async fn delete_from_queue(&self, id: &Uuid, wait: bool) -> Result<()> {
         Err(Error::Internal(eyre!("sample error")))
-    }
-
-    fn clone(&self) -> Self {
-        Self {
-            success: self.success,
-        }
     }
 
     async fn drop_db(&self) -> Result<()> {

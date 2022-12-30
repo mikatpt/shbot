@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use strum::EnumString;
 use tracing::debug;
 
-use crate::{manager::Manager, server::State, store::Client, Error, Result};
+use crate::{manager::Manager, server::State, Error, Result};
 
 const HELLO: &str =
     ":wave: Hi! I'm ShereeBot. Sheree's brother built me to help her manage your film assignments!
@@ -24,18 +24,18 @@ Valid commands include `deliver-work`, and `request-work`!
 Sheree can also run the `add-films` command!";
 
 /// Manager which handles all app_mention events.
-pub(crate) struct AppMention<T: Client> {
-    state: State<T>,
+pub(crate) struct AppMention {
+    state: State,
     text: String,
     ts: String,
     channel: String,
     user: String,
 }
 
-impl<T: Client> AppMention<T> {
+impl AppMention {
     #[rustfmt::skip]
     pub(crate) fn new(
-        state: State<T>,
+        state: State,
         text: String,
         ts: String,
         channel: String,
@@ -166,10 +166,10 @@ impl Response {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{server::InnerState, store::mock::MockClient};
+    use crate::server::InnerState;
 
-    fn setup() -> AppMention<MockClient> {
-        let state = InnerState::<MockClient>::_new();
+    fn setup() -> AppMention {
+        let state = InnerState::_new();
         AppMention {
             state,
             user: "".to_string(),

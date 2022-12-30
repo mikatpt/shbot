@@ -13,6 +13,7 @@ use crate::{queue::QueueItem, slack::UserResponse, store::Client, Error, Result}
 use models::{Film, Priority, Role, Roles, Student};
 
 /// Internal Postgres client.
+#[derive(Clone)]
 pub struct PostgresClient {
     pool: Pool,
 }
@@ -20,6 +21,14 @@ pub struct PostgresClient {
 impl PostgresClient {
     pub(crate) fn new(pool: Pool) -> Self {
         Self { pool }
+    }
+}
+// Axum requires that we implement debug to use this in state.
+impl std::fmt::Debug for PostgresClient {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PostgresClient")
+            .field("pool", &"<pool>")
+            .finish()
     }
 }
 
@@ -466,12 +475,6 @@ impl Client for PostgresClient {
         client.query(&stmt, &[&id]).await?;
 
         Ok(())
-    }
-
-    fn clone(&self) -> Self {
-        Self {
-            pool: self.pool.clone(),
-        }
     }
 
     async fn drop_db(&self) -> Result<()> {

@@ -5,11 +5,7 @@ use color_eyre::{Help, Result};
 use deadpool_postgres::Runtime::Tokio1;
 use models::{Priority, Role};
 use serial_test::serial;
-use shbot::{
-    logger,
-    queue::QueueItem,
-    store::{Database, PostgresClient},
-};
+use shbot::{logger, queue::QueueItem, store::Database};
 use tokio::test;
 use tracing::info;
 
@@ -26,7 +22,7 @@ fn pg_conf() -> deadpool_postgres::Config {
     }
 }
 
-async fn setup() -> Result<Database<PostgresClient>> {
+async fn setup() -> Result<Database> {
     INIT.call_once(|| {
         env::set_var("ENVIRONMENT", "test");
         // set to trace to debug things
@@ -62,7 +58,7 @@ async fn setup() -> Result<Database<PostgresClient>> {
     let statement = include_str!("./test_schema.sql");
     client.batch_execute(statement).await?;
 
-    let db = Database::<PostgresClient>::new(&pg_conf())?;
+    let db = shbot::store::new(&pg_conf())?;
 
     Ok(db)
 }

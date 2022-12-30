@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use std::{collections::HashSet, fmt::Debug};
+use std::collections::HashSet;
 
 use async_trait::async_trait;
 use deadpool_postgres::Runtime::Tokio1;
@@ -11,163 +11,87 @@ use models::{Film, Priority, Role, Student};
 
 pub mod postgres;
 pub use postgres::PostgresClient;
+
 pub mod mock;
 
 /// Server-facing API boundary.
-//
-// You should implement all methods from the `Client` trait on this struct for each new client.
-//
-// This is not statically checked; that would require us writing and implementing an external
-// trait, which just isn't done in Rust; you'd have to import the trait on every usage.
-#[derive(Debug)]
-pub struct Database<T: Client> {
-    client: T,
-}
+pub type Database = Box<dyn Client>;
 
 #[async_trait]
-/// Internal interface. All clients must implement this.
-pub trait Client: Send + Sync + 'static {
+/// Internal database interface.
+///
+/// This requires that your database client use some sort of synchronization primitive to allow for
+/// sending across threads (ergo the `Send + Sync + 'static` bounds.)
+pub trait Client: CloneClient + Send + Sync + 'static {
+    /// Retrieves all films.
     async fn list_films(&self) -> Result<Vec<Film>>;
+    /// Retrieves a film given its name.
     async fn get_film(&self, film_name: &str) -> Result<Option<Film>>;
+    /// Inserts an empty film with no roles worked.
     async fn insert_film(&self, name: &str, group_number: i32, priority: Priority) -> Result<Film>;
+    /// Updates a film.
     async fn update_film(&self, film: &Film) -> Result<()>;
 
+    /// Retrieves all films a student has worked on.
     async fn get_worked_films(&self, student_id: &Uuid) -> Result<HashSet<Film>>;
+    /// Inserts a shared student_film marker.
     async fn insert_student_films(&self, s_id: &Uuid, f_id: &Uuid) -> Result<()>;
+    /// Gets all films where given role is available AND student is not in its group.
     async fn get_films_exclusionary(&self, group: i32, role: Role) -> Result<Vec<Film>>;
 
+    /// Retrieve all students.
     async fn list_students(&self) -> Result<Vec<Student>>;
+    /// Get a student from the database. If none, insert the student and return it.
     async fn get_student(&self, slack_id: &str) -> Result<Student>;
+    /// From csv upload
     async fn insert_student_from_csv(&self, name: &str, group: i32, class: &str)
         -> Result<Student>;
+    /// Insert a student. This should ONLY be called if the student isn't in the database.
     async fn insert_student(&self, slack_id: &str, name: &str) -> Result<Student>;
+    /// Updates a students information.
     async fn update_student(&self, student: &Student) -> Result<()>;
 
+    /// Inserts a job or student to the wait queue.
     async fn get_queue(&self, wait: bool) -> Result<Vec<QueueItem>>;
+    /// Gets all items from given queue.
     async fn insert_to_queue(&self, q: QueueItem, wait: bool) -> Result<QueueItem>;
+    /// Deletes an item from the given queue.
     async fn delete_from_queue(&self, id: &Uuid, wait: bool) -> Result<()>;
 
-    async fn drop_db(&self) -> Result<()>;
-
-    #[must_use]
-    fn clone(&self) -> Self;
-}
-
-impl<T: Client> Clone for Database<T> {
-    fn clone(&self) -> Self {
-        Self {
-            client: self.client.clone(),
-        }
-    }
-}
-
-impl<T: Client> Database<T> {
-    // ------------- Films ------------- //
-
-    /// Retrieves all films.
-    pub async fn list_films(&self) -> Result<Vec<Film>> {
-        self.client.list_films().await
-    }
-
-    /// Retrieves a film given its name.
-    pub async fn get_film(&self, film_name: &str) -> Result<Option<Film>> {
-        self.client.get_film(film_name).await
-    }
-
-    /// Inserts an empty film with no roles worked.
-    pub async fn insert_film(&self, name: &str, group: i32, priority: Priority) -> Result<Film> {
-        self.client.insert_film(name, group, priority).await
-    }
-
-    /// Updates a film.
-    pub async fn update_film(&self, film: &Film) -> Result<()> {
-        self.client.update_film(film).await
-    }
-
-    // ------------- Junction ------------- //
-
-    /// Retrieves all films a student has worked on.
-    pub async fn get_worked_films(&self, student_id: &Uuid) -> Result<HashSet<Film>> {
-        self.client.get_worked_films(student_id).await
-    }
-
-    /// Inserts a shared student_film marker.
-    pub async fn insert_student_films(&self, student_id: &Uuid, film_id: &Uuid) -> Result<()> {
-        self.client.insert_student_films(student_id, film_id).await
-    }
-
-    /// Gets all films where given role is available AND student is not in its group.
-    pub async fn get_films_exclusionary(&self, group: i32, role: Role) -> Result<Vec<Film>> {
-        self.client.get_films_exclusionary(group, role).await
-    }
-
-    // ------------- Students ------------- //
-
-    /// Retrieve all students.
-    pub async fn list_students(&self) -> Result<Vec<Student>> {
-        self.client.list_students().await
-    }
-
-    /// Get a student from the database. If none, insert the student and return it.
-    pub async fn get_student(&self, slack_id: &str) -> Result<Student> {
-        self.client.get_student(slack_id).await
-    }
-
-    #[rustfmt::skip]
-    /// From csv upload
-    pub async fn insert_student_from_csv(&self, name: &str, group: i32, class: &str)
-        -> Result<Student> {
-        self.client.insert_student_from_csv(name, group, class).await
-    }
-
-    /// Insert a student. This should ONLY be called if the student isn't in the database.
-    pub async fn insert_student(&self, slack_id: &str, name: &str) -> Result<Student> {
-        self.client.insert_student(slack_id, name).await
-    }
-
-    /// Updates a students information.
-    pub async fn update_student(&self, student: &Student) -> Result<()> {
-        self.client.update_student(student).await
-    }
-
-    // ------------- Queue ------------- //
-
-    /// Inserts a job or student to the wait queue.
-    pub async fn insert_to_queue(&self, q: QueueItem, wait: bool) -> Result<QueueItem> {
-        self.client.insert_to_queue(q, wait).await
-    }
-
-    /// Gets all items from given queue.
-    pub async fn get_queue(&self, wait: bool) -> Result<Vec<QueueItem>> {
-        self.client.get_queue(wait).await
-    }
-
-    /// Deletes an item from the given queue.
-    pub async fn delete_from_queue(&self, id: &Uuid, wait: bool) -> Result<()> {
-        self.client.delete_from_queue(id, wait).await
-    }
-
     /// Drops database. Only works in test env.
-    pub async fn drop_db(&self) -> Result<()> {
-        self.client.drop_db().await
+    async fn drop_db(&self) -> Result<()>;
+}
+
+/// Workaround to allow cloning trait.
+pub trait CloneClient {
+    fn clone_box(&self) -> Database;
+}
+
+impl<T: 'static + Client + Clone> CloneClient for T {
+    fn clone_box(&self) -> Database {
+        Box::new(self.clone())
+    }
+}
+
+impl Clone for Database {
+    fn clone(&self) -> Self {
+        self.clone_box()
+    }
+}
+
+impl std::fmt::Debug for Database {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<Client>")
     }
 }
 
 // Server-facing API implementation for Postgres.
-impl Database<PostgresClient> {
-    /// Returns a new Postgres database instance.
-    pub fn new(cfg: &deadpool_postgres::Config) -> Result<Self> {
-        let pool = cfg.create_pool(Some(Tokio1), NoTls)?;
-        let client = PostgresClient::new(pool);
-        Ok(Database { client })
-    }
+pub fn new(cfg: &deadpool_postgres::Config) -> Result<Database> {
+    let pool = cfg.create_pool(Some(Tokio1), NoTls)?;
+    let client = Box::new(PostgresClient::new(pool));
+    Ok(client)
 }
 
-// Axum requires that we implement debug to use this in state.
-impl Debug for PostgresClient {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("PostgresClient")
-            .field("pool", &"<pool>")
-            .finish()
-    }
+pub fn new_mock() -> Database {
+    Box::new(mock::MockClient { success: true })
 }

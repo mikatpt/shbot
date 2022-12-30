@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use strum::AsRefStr;
 use tracing::{error, info};
 
-use crate::{server::State, store::Client, Error, Result};
+use crate::{server::State, Error, Result};
 
 /// This challenge is sent when the Event API first queries your event endpoint.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -87,7 +87,7 @@ impl EventRequest {
     ///
     /// Normally, we log errors right before reporting them to the user.
     /// Since this can be a long-running task, we will log errors here.
-    pub(crate) async fn handle_event<T: Client>(self, state: State<T>) {
+    pub(crate) async fn handle_event(self, state: State) {
         let result = match self.event {
             Event::AppMention { .. } => self.handle_app_mention(state).await,
             Event::Message { .. } => self.handle_message(state).await,
@@ -98,7 +98,7 @@ impl EventRequest {
         }
     }
 
-    async fn handle_message<T: Client>(self, state: State<T>) -> Result<()> {
+    async fn handle_message(self, state: State) -> Result<()> {
         let (user, channel_type, text, subtype, files) = if let Event::Message {
             user,
             channel_type,
@@ -118,7 +118,7 @@ impl EventRequest {
     }
 
     /// Entry gateway for mentions: branch out based on the parsed operation request.
-    async fn handle_app_mention<T: Client>(self, state: State<T>) -> Result<()> {
+    async fn handle_app_mention(self, state: State) -> Result<()> {
         #[rustfmt::skip]
         let (user, ts, channel, text) = if let Event::AppMention { user, ts, channel, text, .. } = self.event {
             (user, ts, channel, text)

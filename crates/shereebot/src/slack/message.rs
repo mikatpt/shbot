@@ -6,7 +6,7 @@ use super::{
     app_mentions::Response,
     events::{ChannelType, File},
 };
-use crate::{manager::Manager, server::State, store::Client, Result};
+use crate::{manager::Manager, server::State, Result};
 
 const HELLO: &str =
     ":wave: Hi! I'm ShereeBot. Sheree's brother built me to help her manage your film assignments!
@@ -18,8 +18,8 @@ To deliver your work, message me and say `deliver-work`.
 
 As soon as there's work ready to be picked up, I'll let you know!";
 
-pub(crate) struct Message<T: Client> {
-    state: State<T>,
+pub(crate) struct Message {
+    state: State,
     user: String,
     text: String,
     channel_type: ChannelType,
@@ -27,10 +27,10 @@ pub(crate) struct Message<T: Client> {
     files: Option<Vec<File>>,
 }
 
-impl<T: Client> Message<T> {
+impl Message {
     #[rustfmt::skip]
     pub(crate) fn new(
-        state: State<T>,
+        state: State,
         user: String,
         text: String,
         channel_type: ChannelType,
